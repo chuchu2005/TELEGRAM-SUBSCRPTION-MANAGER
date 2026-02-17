@@ -42,7 +42,7 @@ export async function GET(request: NextRequest) {
 
 ━━━━━━━━━━━━━━━━━━━
 
-Your access to the private channel has been removed.
+Your access to Pear VIP signals channel has been removed.
 
 ━━━━━━━━━━━━━━━━━━━
 

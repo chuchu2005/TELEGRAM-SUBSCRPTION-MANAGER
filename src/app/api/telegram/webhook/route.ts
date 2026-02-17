@@ -103,12 +103,12 @@ Choose a plan to get instant access to our VIP community:
 
 💎 <b>Basic Plan</b> - ₦5,000
 ├─ 7 days access
-├─ VIP group only
+├─ Pear VIP signals channel only
 └─ Perfect for trying out
 
 👑 <b>Premium Plan</b> - ₦22,000
 ├─ 14 days access
-├─ VIP group + Auto Copier Bot
+├─ Pear VIP signals channel + Auto Copier Bot
 └─ Best value for serious traders
 
 ━━━━━━━━━━━━━━━━━━━
@@ -259,11 +259,11 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
 💳 <b>Step 2: Choose Your Plan</b>
 
 💎 <b>Basic Plan</b> - ₦5,000
-├─ 7 days VIP access
+├─ 7 days access to Pear VIP signals channel
 └─ For trying out
 
 👑 <b>Premium Plan</b> - ₦22,000
-├─ 14 days VIP + Copier Bot
+├─ 14 days access to Pear VIP signals channel + Copier Bot
 └─ Best value
 
 ━━━━━━━━━━━━━━━━━━━

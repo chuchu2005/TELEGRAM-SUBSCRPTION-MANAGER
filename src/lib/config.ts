@@ -28,7 +28,7 @@ export const RATE_LIMIT = {
   blockDurationMs: 3600000  // 1 hour
 }
 
-export const CHANNEL_NAME = 'Premium VIP Community'
+export const CHANNEL_NAME = 'Pear VIP signals channel'
 
 // Helper function to get plan by type
 export function getPlan(planType: PlanType) {
