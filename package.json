@@ -9,7 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@prisma/client": "^6.19.0",
     "next": "16.1.6",
+    "prisma": "^6.19.0",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
@@ -21,6 +23,7 @@
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
+    "ngrok": "^5.0.0-beta.2",
     "tailwindcss": "^4",
     "typescript": "^5"
   }

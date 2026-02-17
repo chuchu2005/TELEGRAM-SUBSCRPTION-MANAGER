@@ -1,0 +1,31 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+model Subscription {
+  id               String    @id @default(auto()) @map("_id") @db.ObjectId
+  telegramUserId   String    // Store as String - IDs can exceed 32-bit
+  telegramUsername String?
+  telegramName     String?
+  paystackRef      String    @unique  // Prevent double redemption
+  customerEmail    String?
+  amountKobo       Int
+  planType         String    // "basic" or "premium"
+  hasCopierAccess  Boolean   @default(false)  // Premium users get copier access
+  startedAt        DateTime  @default(now())
+  expiresAt        DateTime  // startedAt + 7 days (basic) or +14 days (premium)
+  isRemoved        Boolean   @default(false)
+  removedAt        DateTime?
+  inviteLinkUsed   String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([telegramUserId])
+  @@index([expiresAt, isRemoved])
+  @@index([planType])
+}

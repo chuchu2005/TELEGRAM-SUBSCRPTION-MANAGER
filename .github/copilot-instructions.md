@@ -1,0 +1,6 @@
+- [x] Project scaffolded with Next.js, TypeScript, Tailwind CSS, ESLint, App Router, and src directory.
+- [ ] Install required extensions (none required by default for Next.js).
+- [ ] Compile the project and resolve any issues.
+- [ ] Create and run a dev task.
+- [ ] Launch the project in debug mode if requested.
+- [ ] Ensure documentation is complete (README.md and this file).
