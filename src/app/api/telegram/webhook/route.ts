@@ -106,6 +106,11 @@ Choose a plan to get instant access to our VIP community:
 ├─ Pear VIP signals channel only
 └─ Perfect for trying out
 
+📅 <b>Monthly Plan</b> - ₦15,000
+├─ 30 days access
+├─ Pear VIP signals channel only
+└─ Best for consistent trading
+
 👑 <b>Premium Plan</b> - ₦22,000
 ├─ 14 days access
 ├─ Pear VIP signals channel + Auto Copier Bot
@@ -139,6 +144,7 @@ Send the command: /pay
 
 <b>Step 2: Choose Your Plan</b>
 💎 Basic (₦5,000) - 7 days
+📅 Monthly (₦15,000) - 30 days
 👑 Premium (₦22,000) - 14 days + Copier Bot
 
 <b>Step 3: Make Payment</b>
@@ -152,6 +158,7 @@ Send the command: /pay
 
 <b>Step 5: Verify & Get Access</b>
 • Send: /verify_basic YOUR_REFERENCE
+• Or: /verify_monthly YOUR_REFERENCE
 • Or: /verify_premium YOUR_REFERENCE
 • Bot verifies instantly → sends invite link
 
@@ -231,6 +238,21 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
     const basicData = await basicResponse.json()
     console.log('Basic payment link response:', basicData)
 
+    // Create payment link for Monthly plan
+    const monthlyResponse = await fetch(`${APP_URL}/api/payment/link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: telegramUserId,
+        telegramUsername,
+        planType: 'monthly',
+        email // Pass user's email
+      })
+    })
+
+    const monthlyData = await monthlyResponse.json()
+    console.log('Monthly payment link response:', monthlyData)
+
     // Create payment link for Premium plan
     const premiumResponse = await fetch(`${APP_URL}/api/payment/link`, {
       method: 'POST',
@@ -246,8 +268,8 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
     const premiumData = await premiumResponse.json()
     console.log('Premium payment link response:', premiumData)
 
-    if (!basicData.success || !premiumData.success) {
-      console.error('Payment link generation failed:', { basicData, premiumData })
+    if (!basicData.success || !monthlyData.success || !premiumData.success) {
+      console.error('Payment link generation failed:', { basicData, monthlyData, premiumData })
       await sendMessage(user.id, '❌ Failed to generate payment links. Please try again later.\n\nSend /pay to start over.')
       return
     }
@@ -261,6 +283,10 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
 💎 <b>Basic Plan</b> - ₦5,000
 ├─ 7 days access to Pear VIP signals channel
 └─ For trying out
+
+📅 <b>Monthly Plan</b> - ₦15,000
+├─ 30 days access to Pear VIP signals channel
+└─ Best for consistent trading
 
 👑 <b>Premium Plan</b> - ₦22,000
 ├─ 14 days access to Pear VIP signals channel + Copier Bot
@@ -280,6 +306,7 @@ Then send: /verify_basic REFERENCE
 Or send /pay to start over
 
 💎 Pay ₦5,000 (Basic)
+📅 Pay ₦15,000 (Monthly)
 👑 Pay ₦22,000 (Premium)
 
 Still have questions? Send /help`
@@ -300,6 +327,12 @@ Still have questions? Send /help`
             ],
             [
               { text: '✅ Verify Basic Payment', callback_data: 'verify_basic' }
+            ],
+            [
+              { text: '📅 Pay ₦15,000 (Monthly)', url: monthlyData.authorizationUrl }
+            ],
+            [
+              { text: '✅ Verify Monthly Payment', callback_data: 'verify_monthly' }
             ],
             [
               { text: '👑 Pay ₦22,000 (Premium)', url: premiumData.authorizationUrl }
@@ -341,6 +374,13 @@ function isValidEmail(email: string): boolean {
  */
 async function handleVerifyBasic(user: TelegramUser, reference: string): Promise<void> {
   await handleVerify(user, reference, 'basic')
+}
+
+/**
+ * Handle /verify_monthly command
+ */
+async function handleVerifyMonthly(user: TelegramUser, reference: string): Promise<void> {
+  await handleVerify(user, reference, 'monthly')
 }
 
 /**
@@ -533,17 +573,25 @@ Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
     if (!amountValidation.valid) {
       const remaining = recordFailedAttempt(userId)
       // Check if user used wrong command
-      const otherPlan: PlanType = planType === 'basic' ? 'premium' : 'basic'
-      if (verification.amount === PLANS[otherPlan].amountKobo) {
-        await sendMessage(user.id, `❌ You used /verify_${planType} but paid for the ${otherPlan.charAt(0).toUpperCase() + otherPlan.slice(1)} plan (NGN ${(PLANS[otherPlan].amountKobo / 100).toLocaleString()}).
+      // Try to find which plan the user actually paid for
+      let actualPaidPlan: PlanType | null = null
+      for (const plan of ['basic', 'monthly', 'premium'] as PlanType[]) {
+        if (verification.amount === PLANS[plan].amountKobo) {
+          actualPaidPlan = plan
+          break
+        }
+      }
 
-Please use /verify_${otherPlan} ${cleanRef} instead.
+      if (actualPaidPlan && actualPaidPlan !== planType) {
+        await sendMessage(user.id, `❌ You used /verify_${planType} but paid for the ${actualPaidPlan.charAt(0).toUpperCase() + actualPaidPlan.slice(1)} plan (NGN ${(PLANS[actualPaidPlan].amountKobo / 100).toLocaleString()}).
+
+Please use /verify_${actualPaidPlan} ${cleanRef} instead.
 
 Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
       } else {
         await sendMessage(user.id, `❌ ${amountValidation.message}
 
-Use /verify_basic for Basic (NGN 5,000) or /verify_premium for Premium (NGN 22,000)
+Use /verify_basic for Basic (NGN 5,000), /verify_monthly for Monthly (NGN 15,000), or /verify_premium for Premium (NGN 22,000)
 
 Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
       }
@@ -689,6 +737,7 @@ async function handleUnknown(user: TelegramUser): Promise<void> {
 
 /start - Get started and see payment details
 /verify_basic REF - Verify Basic plan payment
+/verify_monthly REF - Verify Monthly plan payment
 /verify_premium REF - Verify Premium plan payment
 /status - Check your subscription
 /help - Get help`)
@@ -720,14 +769,19 @@ export async function POST(request: NextRequest) {
       })
 
       // Handle verify payment button clicks
-      if (data === 'verify_basic' || data === 'verify_premium') {
-        const planType: PlanType = data === 'verify_basic' ? 'basic' : 'premium'
+      if (data === 'verify_basic' || data === 'verify_monthly' || data === 'verify_premium') {
+        const planType: PlanType = data === 'verify_basic' ? 'basic' : data === 'verify_monthly' ? 'monthly' : 'premium'
 
         // Mark user as waiting for reference
         pendingVerificationUsers.set(userId, planType)
 
         // Send photo with instructions
-        const planName = planType === 'basic' ? 'Basic (₦5,000)' : 'Premium (₦22,000)'
+        const planNames = {
+          basic: 'Basic (₦5,000)',
+          monthly: 'Monthly (₦15,000)',
+          premium: 'Premium (₦22,000)'
+        }
+        const planName = planNames[planType]
         const caption = `✅ <b>Verifying ${planName} Payment</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -743,7 +797,7 @@ Look at the image above 👆 to see where to find your reference in the Paystack
 
 ━━━━━━━━━━━━━━━━━━━
 
-❌ Don't send: /verify_basic REF123
+❌ Don't send: /verify_${planType} REF123
 ❌ Don't send: REF: iby0ro0awd
 ✅ Just send: iby0ro0awd
 
@@ -874,6 +928,42 @@ Or send /cancel to exit.`
           await sendPhoto(from.id, REFERENCE_IMAGE_ID, caption)
         } else {
           await handleVerifyBasic(from, args[0])
+        }
+        break
+
+      case '/verify_monthly':
+        // If no reference provided, show instructions
+        if (!args[0]) {
+          pendingVerificationUsers.set(userId, 'monthly')
+
+          const caption = `✅ <b>Verifying Monthly (₦15,000) Payment</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>⚠️ IMPORTANT:</b>
+<i>ONLY paste the reference code below!</i>
+
+<i>The reference is just letters and numbers (no spaces, no "REF:" prefix)</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+Look at the image above 👆 to see where to find your reference in the Paystack email.
+
+━━━━━━━━━━━━━━━━━━━
+
+❌ Don't send: /verify_monthly REF123
+❌ Don't send: REF: iby0ro0awd
+✅ Just send: iby0ro0awd
+
+━━━━━━━━━━━━━━━━━━━
+
+Just paste the reference number below and I'll verify instantly!
+
+Or send /cancel to exit.`
+
+          await sendPhoto(from.id, REFERENCE_IMAGE_ID, caption)
+        } else {
+          await handleVerifyMonthly(from, args[0])
         }
         break
 

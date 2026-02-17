@@ -7,6 +7,12 @@ export const PLANS = {
     durationDays: 7,
     hasCopierAccess: false
   },
+  monthly: {
+    name: 'Monthly VIP',
+    amountKobo: 1500000,  // NGN 15,000
+    durationDays: 30,
+    hasCopierAccess: false
+  },
   premium: {
     name: 'Premium VIP + Copier',
     amountKobo: 2200000,  // NGN 22,000
