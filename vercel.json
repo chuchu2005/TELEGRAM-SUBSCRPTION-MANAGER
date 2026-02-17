@@ -1,7 +1,5 @@
 {
   "buildCommand": "npm run build",
-  "outputDirectory": ".next",
-  "framework": "nextjs",
   "crons": [
     {
       "path": "/api/cron/remove-expired",
