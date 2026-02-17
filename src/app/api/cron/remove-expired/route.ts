@@ -2,28 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { banChatMember, sendMessage } from '@/lib/telegram'
 
-const CRON_SECRET = process.env.CRON_SECRET!
-
 /**
  * GET handler for cron job to remove expired users
- * Protected by CRON_SECRET in Authorization header
+ * Open endpoint - no authentication required
  */
 export async function GET(request: NextRequest) {
   try {
-    // Verify cron secret
-    const authHeader = request.headers.get('authorization')
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-
-    if (token !== CRON_SECRET) {
-      console.error('Invalid cron secret provided')
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
-
     // Find all expired subscriptions that haven't been removed yet
     const now = new Date()
     const expiredSubscriptions = await prisma.subscription.findMany({
@@ -105,7 +89,7 @@ Or type /pay to get started.`
   }
 }
 
-// Allow POST for testing (will also require auth)
+// Allow POST for testing
 export async function POST(request: NextRequest) {
   return GET(request)
 }

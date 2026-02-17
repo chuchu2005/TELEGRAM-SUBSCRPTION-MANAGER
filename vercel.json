@@ -1,9 +1,0 @@
-{
-  "buildCommand": "npm run build",
-  "crons": [
-    {
-      "path": "/api/cron/remove-expired",
-      "schedule": "0 * * * *"
-    }
-  ]
-}
