@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember } from '@/lib/telegram'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
-import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate } from '@/lib/config'
+import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID } from '@/lib/config'
 import type { TelegramUpdate, TelegramUser } from '@/lib/telegram'
 
 // Telegram file_id for reference.jpg image
@@ -367,6 +367,125 @@ Still have questions? Send /help`
 function isValidEmail(email: string): boolean {
   const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
   return emailRegex.test(email)
+}
+
+/**
+ * Handle /broadcast command - Admin only
+ * Sends a message to all users or filtered by plan/status
+ * Usage: /broadcast message [--plan=basic|monthly|premium|all] [--active]
+ */
+async function handleBroadcast(user: TelegramUser, args: string[]): Promise<void> {
+  // Check if user is admin
+  if (user.id !== ADMIN_ID) {
+    await sendMessage(user.id, '❌ Only the admin can use this command.')
+    return
+  }
+
+  // Parse arguments
+  let message = ''
+  let planType: 'basic' | 'monthly' | 'premium' | 'all' = 'all'
+  let activeOnly = false
+
+  for (const arg of args) {
+    if (arg.startsWith('--plan=')) {
+      const plan = arg.split('=')[1]
+      if (['basic', 'monthly', 'premium', 'all'].includes(plan)) {
+        planType = plan as any
+      }
+    } else if (arg === '--active') {
+      activeOnly = true
+    } else if (!arg.startsWith('--')) {
+      message += (message ? ' ' : '') + arg
+    }
+  }
+
+  if (!message) {
+    await sendMessage(user.id, `❌ Please provide a message to broadcast.
+
+<b>Usage:</b>
+/broadcast Your message here
+
+<b>Options:</b>
+--plan=basic|monthly|premium|all  (default: all)
+--active  (only send to active subscribers)
+
+<b>Examples:</b>
+/broadcast 🎉 Special offer this week!
+/broadcast 📅 Monthly members deal! --plan=monthly --active`)
+    return
+  }
+
+  // Send acknowledgment
+  await sendMessage(user.id, `📢 <b>Broadcasting message...</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+${message}
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Sending to ${planType === 'all' ? 'all users' : planType + ' plan'}${activeOnly ? ' (active only)' : ''}...</i>
+
+<i>I'll send you a summary when done!</i>`)
+
+  // Build query for recipients
+  let whereClause: any = {}
+
+  if (planType !== 'all') {
+    whereClause.planType = planType
+  }
+
+  if (activeOnly) {
+    whereClause.expiresAt = { gt: new Date() }
+    whereClause.isRemoved = false
+  }
+
+  // Get all unique telegram user IDs
+  const subscriptions = await prisma.subscription.findMany({
+    where: whereClause,
+    select: {
+      telegramUserId: true,
+      telegramUsername: true
+    },
+    distinct: ['telegramUserId']
+  })
+
+  // Send message to each user
+  let successCount = 0
+  let failedCount = 0
+  const failedUsers: string[] = []
+
+  for (const subscription of subscriptions) {
+    try {
+      const sent = await sendMessage(subscription.telegramUserId, message)
+      if (sent) {
+        successCount++
+      } else {
+        failedCount++
+        failedUsers.push(subscription.telegramUsername || subscription.telegramUserId.toString())
+      }
+    } catch (error) {
+      failedCount++
+      failedUsers.push(subscription.telegramUsername || subscription.telegramUserId.toString())
+    }
+
+    // Add delay to avoid rate limiting (20 messages per second)
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  // Send summary to admin
+  const summary = `✅ <b>Broadcast Complete!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+📊 <b>Stats:</b>
+• Total recipients: ${subscriptions.length}
+• ✅ Successful: ${successCount}
+• ❌ Failed: ${failedCount}
+
+${failedUsers.length > 0 ? `❌ <b>Failed Users:</b>\n${failedUsers.slice(0, 10).join('\n')}${failedUsers.length > 10 ? `\n... and ${failedUsers.length - 10} more` : ''}` : ''}`
+
+  await sendMessage(user.id, summary)
 }
 
 /**
@@ -1001,6 +1120,10 @@ Or send /cancel to exit.`
         } else {
           await handleVerifyPremium(from, args[0])
         }
+        break
+
+      case '/broadcast':
+        await handleBroadcast(from, args)
         break
 
       case '/status':

@@ -36,6 +36,9 @@ export const RATE_LIMIT = {
 
 export const CHANNEL_NAME = 'Pear VIP signals channel'
 
+// Admin Telegram User ID (only this user can use /broadcast)
+export const ADMIN_ID = 5472144783
+
 // Helper function to get plan by type
 export function getPlan(planType: PlanType) {
   return PLANS[planType]
