@@ -5,7 +5,7 @@ Use this checklist to test the complete webhook-free flow.
 ## Prerequisites
 
 - [ ] Bot is running via ngrok: `http://nonarticulative-atypical-jessi.ngrok-free.dev`
-- [ ] Telegram webhook is set: `https://api.telegram.org/bot7889249725:AAFPenA5s8PTz7Hma0ZVrw7Lo4OQbv1YGlo/setWebhook?url=http://nonarticulative-atypical-jessi.ngrok-free.dev/api/telegram/webhook`
+- [ ] Telegram webhook is set: `https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=http://nonarticulative-atypical-jessi.ngrok-free.dev/api/telegram/webhook`
 - [ ] MongoDB is connected (DATABASE_URL has `/vipbot` database name)
 - [ ] Paystack is in test mode (using `sk_test_...` key)
 
@@ -396,13 +396,13 @@ db.subscriptions.find({ planType: "premium" }).pretty()
 **Fix:**
 ```bash
 # Check webhook status
-curl https://api.telegram.org/bot7889249725:AAFPenA5s8PTz7Hma0ZVrw7Lo4OQbv1YGlo/getWebhookInfo
+curl https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo
 
 # Reset webhook
-curl https://api.telegram.org/bot7889249725:AAFPenA5s8PTz7Hma0ZVrw7Lo4OQbv1YGlo/deleteWebhook
+curl https://api.telegram.org/bot<YOUR_BOT_TOKEN>/deleteWebhook
 
 # Set webhook again
-curl "https://api.telegram.org/bot7889249725:AAFPenA5s8PTz7Hma0ZVrw7Lo4OQbv1YGlo/setWebhook?url=http://nonarticulative-atypical-jessi.ngrok-free.dev/api/telegram/webhook"
+curl "https://api.telegram.org/bot<YOUR_BOT_TOKEN>/setWebhook?url=http://nonarticulative-atypical-jessi.ngrok-free.dev/api/telegram/webhook"
 ```
 
 ### Issue: MongoDB connection error
@@ -432,10 +432,10 @@ Once all tests pass:
 
 ```bash
 # Check webhook info
-curl https://api.telegram.org/bot7889249725:AAFPenA5s8PTz7Hma0ZVrw7Lo4OQbv1YGlo/getWebhookInfo
+curl https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getWebhookInfo
 
 # Get bot info
-curl https://api.telegram.org/bot7889249725:AAFPenA5s8PTz7Hma0ZVrw7Lo4OQbv1YGlo/getMe
+curl https://api.telegram.org/bot<YOUR_BOT_TOKEN>/getMe
 
 # Get webhook test response
 curl http://nonarticulative-atypical-jessi.ngrok-free.dev/api/telegram/webhook
