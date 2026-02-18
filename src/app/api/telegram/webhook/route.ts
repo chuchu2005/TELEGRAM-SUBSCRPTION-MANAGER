@@ -22,6 +22,9 @@ const pendingVerificationUsers = new Map<string, PlanType>()
 // Idempotency: Track references currently being processed to prevent duplicates
 const processingReferences = new Set<string>()
 
+// Promo expiration settings
+const PROMO_EXPIRY_HOURS = 48 // 2 days
+
 /**
  * Check if user is rate limited
  */
@@ -102,19 +105,45 @@ async function handleStart(user: TelegramUser): Promise<void> {
 Choose a plan to get instant access to our VIP community:
 
 💎 <b>Basic Plan</b> - ₦5,000
-├─ 7 days access
-├─ Pear VIP signals channel only
+├─ <b>7 days</b> access to VIP signals
+├─ You copy trades manually
 └─ Perfect for trying out
 
-📅 <b>Monthly Plan</b> - ₦15,000
-├─ 30 days access
-├─ Pear VIP signals channel only
-└─ Best for consistent trading
+📊 <b>Bi-Weekly Plan</b> - ₦10,000
+├─ <b>14 days</b> access to VIP signals
+├─ You copy trades manually
+└─ Great balance of price & duration
 
-👑 <b>Premium Plan</b> - ₦22,000
-├─ 14 days access
-├─ Pear VIP signals channel + Auto Copier Bot
+📅 <b>Monthly Plan</b> - ₦15,000
+├─ <b>30 days</b> access to VIP signals
+├─ You copy trades manually
 └─ Best value for serious traders
+
+👑 <b>Premium Plan - AUTO COPIER</b> - ₦22,000 ⭐
+├─ <b>14 days</b> access to VIP signals
+├─ 🤖 <b>AUTO COPIER BOT</b> - We copy trades FOR YOU!
+├─ Trades execute <b>instantly</b> on your MT5
+├─ <b>Works 24/7</b> even when your phone is OFF
+├─ <b>Zero effort</b> - no manual copying needed
+└─ Make money while you sleep! 💰
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>🔥 Why Premium is BEST:</b>
+
+<b>With Manual Plans (Basic/Bi-Weekly/Monthly):</b>
+❌ You must watch phone 24/7
+❌ You might miss trades while sleeping/busy
+❌ Manual copying = slow entries = lost profits
+❌ Stressful - always checking Telegram
+
+<b>With Premium Auto Copier:</b>
+✅ Trades copied <b>automatically</b> to your MT5
+✅ <b>Instant execution</b> = better entry prices
+✅ <b>Sleep peacefully</b> - bot works while you rest
+✅ <b>Phone data OFF?</b> No problem!
+✅ <b>At work?</b> Bot keeps trading!
+✅ <b>Zero stress</b> - just check profits at end of day
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -143,9 +172,25 @@ async function handleHelp(user: TelegramUser): Promise<void> {
 Send the command: /pay
 
 <b>Step 2: Choose Your Plan</b>
-💎 Basic (₦5,000) - 7 days
-📅 Monthly (₦15,000) - 30 days
-👑 Premium (₦22,000) - 14 days + Copier Bot
+💎 Basic (₦5,000) - 7 days, manual copying
+📊 Bi-Weekly (₦10,000) - 14 days, manual copying
+📅 Monthly (₦15,000) - 30 days, manual copying
+👑 <b>Premium (₦22,000)</b> - 14 days + <b>AUTO COPIER BOT</b> ⭐
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>🔥 Why Choose Premium?</b>
+
+<i>"I was missing trades while sleeping. With Premium Auto Copier, I woke up to ₦45,000 profit!"</i>
+
+<b>Premium Benefits:</b>
+✅ Trades copied <b>automatically</b> to your MT5
+✅ <b>Works 24/7</b> - even when phone is OFF
+✅ <b>Instant execution</b> = better prices
+✅ <b>Zero effort</b> - make money while you sleep
+✅ Perfect for busy people & 9-5 workers
+
+━━━━━━━━━━━━━━━━━━━
 
 <b>Step 3: Make Payment</b>
 • Pay securely with bank transfer
@@ -154,10 +199,10 @@ Send the command: /pay
 <b>Step 4: Get Your Reference</b>
 • After payment, you'll see a receipt
 • Copy the reference (e.g., TXN_1234567890)
-• It looks like: REF_######## or ########
 
 <b>Step 5: Verify & Get Access</b>
 • Send: /verify_basic YOUR_REFERENCE
+• Or: /verify_biweekly YOUR_REFERENCE
 • Or: /verify_monthly YOUR_REFERENCE
 • Or: /verify_premium YOUR_REFERENCE
 • Bot verifies instantly → sends invite link
@@ -165,6 +210,12 @@ Send the command: /pay
 ━━━━━━━━━━━━━━━━━━━
 
 <b>❓ Frequently Asked Questions</b>
+
+<i>Q: What is the Auto Copier Bot?</i>
+A: It automatically copies every trade from our VIP channel to your MT5 account instantly. No manual work needed!
+
+<i>Q: Does it work when my phone is off?</i>
+A: YES! The bot runs on our server 24/7, so trades copy to your MT5 even if your phone is off or no data.
 
 <i>Q: What if I don't have a reference?</i>
 A: Make sure you copy it from the Paystack success page after payment.
@@ -180,7 +231,7 @@ A: Send /pay to start over, or /status to check your current subscription.
 
 ━━━━━━━━━━━━━━━━━━━
 
-<i>Ready? Send /pay to begin!</i>`
+<i>Ready to start making passive income? Send /pay to begin!</i>`
 
   await sendMessage(user.id, message)
 }
@@ -238,6 +289,21 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
     const basicData = await basicResponse.json()
     console.log('Basic payment link response:', basicData)
 
+    // Create payment link for Bi-Weekly plan
+    const biweeklyResponse = await fetch(`${APP_URL}/api/payment/link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: telegramUserId,
+        telegramUsername,
+        planType: 'biweekly',
+        email // Pass user's email
+      })
+    })
+
+    const biweeklyData = await biweeklyResponse.json()
+    console.log('Bi-Weekly payment link response:', biweeklyData)
+
     // Create payment link for Monthly plan
     const monthlyResponse = await fetch(`${APP_URL}/api/payment/link`, {
       method: 'POST',
@@ -268,8 +334,8 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
     const premiumData = await premiumResponse.json()
     console.log('Premium payment link response:', premiumData)
 
-    if (!basicData.success || !monthlyData.success || !premiumData.success) {
-      console.error('Payment link generation failed:', { basicData, monthlyData, premiumData })
+    if (!basicData.success || !biweeklyData.success || !monthlyData.success || !premiumData.success) {
+      console.error('Payment link generation failed:', { basicData, biweeklyData, monthlyData, premiumData })
       await sendMessage(user.id, '❌ Failed to generate payment links. Please try again later.\n\nSend /pay to start over.')
       return
     }
@@ -281,16 +347,34 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
 💳 <b>Step 2: Choose Your Plan</b>
 
 💎 <b>Basic Plan</b> - ₦5,000
-├─ 7 days access to Pear VIP signals channel
+├─ <b>7 days</b> access to VIP signals
+├─ You copy trades manually
 └─ For trying out
 
+📊 <b>Bi-Weekly Plan</b> - ₦10,000
+├─ <b>14 days</b> access to VIP signals
+├─ You copy trades manually
+└─ Great balance of price & duration
+
 📅 <b>Monthly Plan</b> - ₦15,000
-├─ 30 days access to Pear VIP signals channel
+├─ <b>30 days</b> access to VIP signals
+├─ You copy trades manually
 └─ Best for consistent trading
 
-👑 <b>Premium Plan</b> - ₦22,000
-├─ 14 days access to Pear VIP signals channel + Copier Bot
-└─ Best value
+👑 <b>Premium - AUTO COPIER</b> - ₦22,000 ⭐
+├─ <b>14 days</b> VIP signals + <b>AUTO COPIER BOT</b>
+├─ 🤖 Trades copy <b>automatically</b> to your MT5
+├─ 💰 Make money while you sleep
+├─ 📴 Works even when phone is OFF
+├─ ⚡ <b>Instant execution</b> - never miss a trade
+└─ 🚀 <b>Zero effort</b> - fully automated!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>🔥 Premium = Passive Income!</b>
+
+Stop missing trades while you sleep/busy.
+Let our bot copy trades FOR you 24/7!
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -305,9 +389,10 @@ Then send: /verify_basic REFERENCE
 
 Or send /pay to start over
 
-💎 Pay ₦5,000 (Basic)
-📅 Pay ₦15,000 (Monthly)
-👑 Pay ₦22,000 (Premium)
+💎 Pay ₦5,000 (Basic - 7 days)
+📊 Pay ₦10,000 (Bi-Weekly - 14 days)
+📅 Pay ₦15,000 (Monthly - 30 days)
+👑 Pay ₦22,000 (Premium - 14 days + Auto Copier) ⭐
 
 Still have questions? Send /help`
 
@@ -327,6 +412,12 @@ Still have questions? Send /help`
             ],
             [
               { text: '✅ Verify Basic Payment', callback_data: 'verify_basic' }
+            ],
+            [
+              { text: '📊 Pay ₦10,000 (Bi-Weekly)', url: biweeklyData.authorizationUrl }
+            ],
+            [
+              { text: '✅ Verify Bi-Weekly Payment', callback_data: 'verify_biweekly' }
             ],
             [
               { text: '📅 Pay ₦15,000 (Monthly)', url: monthlyData.authorizationUrl }
@@ -371,51 +462,203 @@ function isValidEmail(email: string): boolean {
 
 /**
  * Handle /broadcast command - Admin only
- * Sends a message to all users or filtered by plan/status
- * Usage: /broadcast message [--plan=basic|monthly|premium|all] [--active]
+ * Sends message to ALL users
+ * Usage: /broadcast Your message here
  */
 async function handleBroadcast(user: TelegramUser, args: string[]): Promise<void> {
+  await sendBroadcast(user, args, 'all', false)
+}
+
+/**
+ * Handle /broadcast_active command - Admin only
+ * Sends message to active subscribers only
+ * Usage: /broadcast_active Your message here
+ */
+async function handleBroadcastActive(user: TelegramUser, args: string[]): Promise<void> {
+  await sendBroadcast(user, args, 'all', true)
+}
+
+/**
+ * Handle /broadcast_premium command - Admin only
+ * Sends message to premium users only
+ * Usage: /broadcast_premium Your message here
+ */
+async function handleBroadcastPremium(user: TelegramUser, args: string[]): Promise<void> {
+  await sendBroadcast(user, args, 'premium', false)
+}
+
+/**
+ * Handle /broadcast_promo command - Admin only
+ * Sends promo offer with payment button to ALL users
+ * Usage: /broadcast_promo
+ * Note: Each broadcast creates FRESH payment links that expire after 2 days.
+ */
+async function handleBroadcastPromo(user: TelegramUser): Promise<void> {
   // Check if user is admin
   if (user.id !== ADMIN_ID) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
 
-  // Parse arguments
-  let message = ''
-  let planType: 'basic' | 'monthly' | 'premium' | 'all' = 'all'
-  let activeOnly = false
+  const broadcastTimestamp = Date.now()
 
-  for (const arg of args) {
-    if (arg.startsWith('--plan=')) {
-      const plan = arg.split('=')[1]
-      if (['basic', 'monthly', 'premium', 'all'].includes(plan)) {
-        planType = plan as any
+  // Create FRESH promo payment link for this broadcast
+  // Note: User will provide their actual email during payment
+  const promoResponse = await fetch(`${APP_URL}/api/payment/link`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      telegramId: ADMIN_ID.toString(),
+      telegramUsername: 'admin',
+      planType: 'promo',
+      email: 'promo@pearvip.com', // Generic email - user provides theirs during payment
+      metadata: {
+        broadcastTimestamp: broadcastTimestamp.toString() // Timestamp stored in metadata
       }
-    } else if (arg === '--active') {
-      activeOnly = true
-    } else if (!arg.startsWith('--')) {
-      message += (message ? ' ' : '') + arg
-    }
+    })
+  })
+
+  const promoData = await promoResponse.json()
+
+  if (!promoData.success) {
+    await sendMessage(user.id, '❌ Failed to generate promo payment link. Please try again.')
+    return
   }
 
-  if (!message) {
+  // Get ALL users (send to everyone, including previous buyers)
+  const allUsers = await prisma.subscription.findMany({
+    select: {
+      telegramUserId: true,
+      telegramUsername: true
+    },
+    distinct: ['telegramUserId']
+  })
+
+  const expiryDate = new Date(broadcastTimestamp + (PROMO_EXPIRY_HOURS * 60 * 60 * 1000))
+  const expiryHours = Math.floor(PROMO_EXPIRY_HOURS)
+
+  await sendMessage(user.id, `📢 <b>Sending Promo Broadcast...</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+🔥 <b>Special Promo Offer - ₦3,000 (7 days)</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Sending to ${allUsers.length} users...
+
+Links expire in ${expiryHours} hours (${expiryDate.toLocaleDateString()})
+
+I'll send you a summary when done!`)
+
+  let successCount = 0
+  let failedCount = 0
+
+  const promoMessage = `🔥 <b>SPECIAL PROMO OFFER!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+💎 <b>LIMITED TIME: 7 Days for ONLY ₦3,000!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+That's <b>₦2,000 OFF</b> the regular Basic plan!
+
+Perfect for:
+• Trying out our VIP signals
+• Seeing the quality of our trades
+• Getting started with low risk
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>⚠️ IMPORTANT:</b>
+• Each payment link expires in ${expiryHours} hours
+• After expiry, wait for the next promo broadcast
+• Links work ONCE only
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Don't miss this chance! Click below to get instant access!</i>`
+
+  for (const targetUser of allUsers) {
+    try {
+      // Send message with payment button
+      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: targetUser.telegramUserId,
+          text: promoMessage,
+          parse_mode: 'HTML',
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: '🔥 Get ₦3,000 Promo (7 Days)', url: promoData.authorizationUrl }
+              ],
+              [
+                { text: '✅ Verify Promo Payment', callback_data: 'verify_promo' }
+              ]
+            ]
+          }
+        })
+      })
+      successCount++
+    } catch (error) {
+      failedCount++
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  await sendMessage(user.id, `✅ <b>Promo Broadcast Complete!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+📊 <b>Stats:</b>
+• ✅ Sent successfully: ${successCount}
+• ❌ Failed: ${failedCount}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Important:</b>
+• Links expire in ${expiryHours} hours
+• Each link works ONCE only
+• After expiry, send new broadcast for fresh links`)
+}
+
+/**
+ * Shared broadcast function
+ */
+async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basic' | 'biweekly' | 'monthly' | 'premium' | 'all', activeOnly: boolean): Promise<void> {
+  // Check if user is admin
+  if (user.id !== ADMIN_ID) {
+    await sendMessage(user.id, '❌ Only the admin can use this command.')
+    return
+  }
+
+  // Get message from args
+  const message = args.join(' ')
+
+  if (!message.trim()) {
     await sendMessage(user.id, `❌ Please provide a message to broadcast.
 
 <b>Usage:</b>
 /broadcast Your message here
 
-<b>Options:</b>
---plan=basic|monthly|premium|all  (default: all)
---active  (only send to active subscribers)
+<b>Available commands:</b>
+/broadcast - Send to everyone
+/broadcast_active - Send to active subscribers only
+/broadcast_premium - Send to premium users only
 
-<b>Examples:</b>
-/broadcast 🎉 Special offer this week!
-/broadcast 📅 Monthly members deal! --plan=monthly --active`)
+<b>Example:</b>
+/broadcast 🎉 Special offer this week!`)
     return
   }
 
   // Send acknowledgment
+  const targetType = planType === 'all' ? 'all users' : `${planType} users`
+  const filterType = activeOnly ? 'active subscribers only' : targetType
+
   await sendMessage(user.id, `📢 <b>Broadcasting message...</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -424,7 +667,7 @@ ${message}
 
 ━━━━━━━━━━━━━━━━━━━
 
-<i>Sending to ${planType === 'all' ? 'all users' : planType + ' plan'}${activeOnly ? ' (active only)' : ''}...</i>
+<i>Sending to ${filterType}...</i>
 
 <i>I'll send you a summary when done!</i>`)
 
@@ -496,10 +739,24 @@ async function handleVerifyBasic(user: TelegramUser, reference: string): Promise
 }
 
 /**
+ * Handle /verify_biweekly command
+ */
+async function handleVerifyBiweekly(user: TelegramUser, reference: string): Promise<void> {
+  await handleVerify(user, reference, 'biweekly')
+}
+
+/**
  * Handle /verify_monthly command
  */
 async function handleVerifyMonthly(user: TelegramUser, reference: string): Promise<void> {
   await handleVerify(user, reference, 'monthly')
+}
+
+/**
+ * Handle /verify_promo command
+ */
+async function handleVerifyPromo(user: TelegramUser, reference: string): Promise<void> {
+  await handleVerify(user, reference, 'promo')
 }
 
 /**
@@ -598,12 +855,13 @@ This transaction reference has already been redeemed.
 ━━━━━━━━━━━━━━━━━━━
 
 <b>What to do:</b>
-• Make a new payment to get a new reference
-• Use the new reference to verify
+• Wait for the next promo broadcast
+• Each broadcast has FRESH payment links
+• Old links stop working after one purchase
 
 ━━━━━━━━━━━━━━━━━━━
 
-Type /pay to make a new payment and get a fresh reference!`)
+Type /pay to see our regular plans!`)
       return
     }
 
@@ -683,6 +941,45 @@ Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
       return
     }
 
+    // Check if promo payment link has expired (2 days)
+    if (planType === 'promo') {
+      // Extract broadcast timestamp from transaction metadata
+      const metadataTimestamp = verification.metadata?.broadcastTimestamp
+      let broadcastTimestamp: number | undefined
+
+      if (metadataTimestamp) {
+        broadcastTimestamp = parseInt(metadataTimestamp, 10)
+      }
+
+      if (broadcastTimestamp) {
+        const now = Date.now()
+        const hoursSinceBroadcast = (now - broadcastTimestamp) / (1000 * 60 * 60)
+
+        if (hoursSinceBroadcast > PROMO_EXPIRY_HOURS) {
+          const remaining = getRemainingAttempts(userId)
+          await sendMessage(user.id, `❌ <b>Promo Link Expired!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+This promo link was sent more than 2 days ago.
+
+Promo links expire after ${PROMO_EXPIRY_HOURS} hours to ensure fair pricing.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>What to do:</b>
+• Wait for the next promo broadcast
+• New broadcasts create fresh links
+• Or use /pay to see regular plans
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Remaining attempts:</b> ${remaining} of ${RATE_LIMIT.maxAttempts}`)
+          return
+        }
+      }
+    }
+
     // Get expected amount for the plan
     const expectedAmount = PLANS[planType].amountKobo
 
@@ -694,7 +991,7 @@ Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
       // Check if user used wrong command
       // Try to find which plan the user actually paid for
       let actualPaidPlan: PlanType | null = null
-      for (const plan of ['basic', 'monthly', 'premium'] as PlanType[]) {
+      for (const plan of ['basic', 'biweekly', 'monthly', 'promo', 'premium'] as PlanType[]) {
         if (verification.amount === PLANS[plan].amountKobo) {
           actualPaidPlan = plan
           break
@@ -710,7 +1007,7 @@ Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
       } else {
         await sendMessage(user.id, `❌ ${amountValidation.message}
 
-Use /verify_basic for Basic (NGN 5,000), /verify_monthly for Monthly (NGN 15,000), or /verify_premium for Premium (NGN 22,000)
+Use /verify_basic for Basic (NGN 5,000), /verify_biweekly for Bi-Weekly (NGN 10,000), /verify_monthly for Monthly (NGN 15,000), /verify_promo for Promo (NGN 3,000), or /verify_premium for Premium (NGN 22,000)
 
 Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
       }
@@ -856,6 +1153,7 @@ async function handleUnknown(user: TelegramUser): Promise<void> {
 
 /start - Get started and see payment details
 /verify_basic REF - Verify Basic plan payment
+/verify_biweekly REF - Verify Bi-Weekly plan payment
 /verify_monthly REF - Verify Monthly plan payment
 /verify_premium REF - Verify Premium plan payment
 /status - Check your subscription
@@ -888,8 +1186,8 @@ export async function POST(request: NextRequest) {
       })
 
       // Handle verify payment button clicks
-      if (data === 'verify_basic' || data === 'verify_monthly' || data === 'verify_premium') {
-        const planType: PlanType = data === 'verify_basic' ? 'basic' : data === 'verify_monthly' ? 'monthly' : 'premium'
+      if (data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo' || data === 'verify_premium') {
+        const planType: PlanType = data === 'verify_basic' ? 'basic' : data === 'verify_biweekly' ? 'biweekly' : data === 'verify_monthly' ? 'monthly' : data === 'verify_promo' ? 'promo' : 'premium'
 
         // Mark user as waiting for reference
         pendingVerificationUsers.set(userId, planType)
@@ -897,7 +1195,9 @@ export async function POST(request: NextRequest) {
         // Send photo with instructions
         const planNames = {
           basic: 'Basic (₦5,000)',
+          biweekly: 'Bi-Weekly (₦10,000)',
           monthly: 'Monthly (₦15,000)',
+          promo: 'Promo (₦3,000)',
           premium: 'Premium (₦22,000)'
         }
         const planName = planNames[planType]
@@ -1050,6 +1350,42 @@ Or send /cancel to exit.`
         }
         break
 
+      case '/verify_biweekly':
+        // If no reference provided, show instructions
+        if (!args[0]) {
+          pendingVerificationUsers.set(userId, 'biweekly')
+
+          const caption = `✅ <b>Verifying Bi-Weekly (₦10,000) Payment</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>⚠️ IMPORTANT:</b>
+<i>ONLY paste the reference code below!</i>
+
+<i>The reference is just letters and numbers (no spaces, no "REF:" prefix)</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+Look at the image above 👆 to see where to find your reference in the Paystack email.
+
+━━━━━━━━━━━━━━━━━━━
+
+❌ Don't send: /verify_biweekly REF123
+❌ Don't send: REF: iby0ro0awd
+✅ Just send: iby0ro0awd
+
+━━━━━━━━━━━━━━━━━━━
+
+Just paste the reference number below and I'll verify instantly!
+
+Or send /cancel to exit.`
+
+          await sendPhoto(from.id, REFERENCE_IMAGE_ID, caption)
+        } else {
+          await handleVerifyBiweekly(from, args[0])
+        }
+        break
+
       case '/verify_monthly':
         // If no reference provided, show instructions
         if (!args[0]) {
@@ -1083,6 +1419,45 @@ Or send /cancel to exit.`
           await sendPhoto(from.id, REFERENCE_IMAGE_ID, caption)
         } else {
           await handleVerifyMonthly(from, args[0])
+        }
+        break
+
+      case '/verify_promo':
+        // If no reference provided, show instructions
+        if (!args[0]) {
+          pendingVerificationUsers.set(userId, 'promo')
+
+          const caption = `✅ <b>Verifying Promo (₦3,000) Payment</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>⚠️ IMPORTANT:</b>
+<i>ONLY paste the reference code below!</i>
+
+<i>The reference is just letters and numbers (no spaces, no "REF:" prefix)</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+Look at the image above 👆 to see where to find your reference in the Paystack email.
+
+━━━━━━━━━━━━━━━━━━━
+
+❌ Don't send: /verify_promo REF123
+❌ Don't send: REF: iby0ro0awd
+✅ Just send: iby0ro0awd
+
+━━━━━━━━━━━━━━━━━━━
+
+Each payment link works ONCE only!
+Wait for next broadcast for fresh links.
+
+Just paste the reference number below and I'll verify instantly!
+
+Or send /cancel to exit.`
+
+          await sendPhoto(from.id, REFERENCE_IMAGE_ID, caption)
+        } else {
+          await handleVerifyPromo(from, args[0])
         }
         break
 
@@ -1124,6 +1499,18 @@ Or send /cancel to exit.`
 
       case '/broadcast':
         await handleBroadcast(from, args)
+        break
+
+      case '/broadcast_active':
+        await handleBroadcastActive(from, args)
+        break
+
+      case '/broadcast_premium':
+        await handleBroadcastPremium(from, args)
+        break
+
+      case '/broadcast_promo':
+        await handleBroadcastPromo(from)
         break
 
       case '/status':

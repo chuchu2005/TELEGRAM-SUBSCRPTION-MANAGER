@@ -18,6 +18,7 @@ export interface PaystackTransaction {
       first_name: string
       last_name: string
     }
+    metadata: Record<string, any> | null
     paid_at: string
     created_at: string
   }
@@ -29,6 +30,7 @@ export interface VerificationResult {
   amount?: number
   customerEmail?: string
   channel?: string
+  metadata?: Record<string, any>
   error?: string
 }
 
@@ -54,14 +56,15 @@ export async function verifyTransaction(reference: string): Promise<Verification
       }
     }
 
-    const { status, amount, channel, customer } = data.data
+    const { status, amount, channel, customer, metadata } = data.data
 
     return {
       success: true,
       status,
       amount,
       customerEmail: customer?.email,
-      channel
+      channel,
+      metadata: metadata || undefined
     }
   } catch (error) {
     console.error('Error verifying transaction with Paystack:', error)

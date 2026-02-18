@@ -50,6 +50,7 @@ Your access to Pear VIP signals channel has been removed.
 Just tap the button below to make a new payment!
 
 💎 Basic: ₦5,000 (7 days)
+📊 Bi-Weekly: ₦10,000 (14 days)
 📅 Monthly: ₦15,000 (30 days)
 👑 Premium: ₦22,000 (14 days + Copier)
 
