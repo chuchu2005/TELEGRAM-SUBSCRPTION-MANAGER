@@ -24,8 +24,59 @@ model Subscription {
   inviteLinkUsed   String?
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
+  mt5Setup         Mt5Setup? // Relation to MT5 setup for Premium users
 
   @@index([telegramUserId])
   @@index([expiresAt, isRemoved])
   @@index([planType])
+}
+
+model Mt5Setup {
+  id                    String   @id @default(auto()) @map("_id") @db.ObjectId
+  subscriptionId        String   @unique @db.ObjectId
+  subscription          Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  // MT5 Account Details (password encrypted)
+  loginAccountNumber    String
+  loginAccountPassword  String   // AES-256-CBC encrypted
+  loginServer           String
+  regionId              Int      @default(2) // MetaCopier region ID (2 = London)
+
+  // MetaCopier IDs
+  metacopierAccountId   String?  // UUID from MetaCopier
+  metacopierCopierId    String?  // UUID from MetaCopier
+
+  // Copier Settings
+  lotSize               Float    @default(0.01)  // User's desired lot size (multiplier calculated from this)
+  copierMultiplier      Float    @default(1.0)   // Calculated as lotSize / 0.01
+  maxLotSize            Float    @default(0.02)  // Maximum lot size per position
+  maximumLot            Float    @default(0.2)   // Maximum total exposure
+  maxOpenPositions      Int      @default(10)
+  copyStopLoss          Boolean  @default(true)
+  copyTakeProfit        Boolean  @default(true)
+
+  // Status tracking
+  setupStatus           String   @default("pending") // pending, active, error
+  statusMessage         String?
+
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  @@index([metacopierAccountId])
+}
+
+model ConversationState {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  telegramUserId   String   @unique
+
+  // MT5 Setup Flow State
+  step             String   // "account_number", "password", "confirming"
+  accountNumber    String?
+  password         String?  // Will be encrypted when stored
+  server           String?
+
+  // Session tracking
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  expiresAt        DateTime // Expiration time (set in application code)
 }

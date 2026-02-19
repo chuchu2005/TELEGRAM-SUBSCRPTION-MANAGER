@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { banChatMember, sendMessage } from '@/lib/telegram'
+import { removeUserMt5Account } from '@/lib/metacopier'
 
 /**
  * GET handler for cron job to remove expired users
@@ -14,7 +15,8 @@ export async function GET(request: NextRequest) {
       where: {
         expiresAt: { lt: now },
         isRemoved: false
-      }
+      },
+      include: { mt5Setup: true } // Include MT5 setup data
     })
 
     let removedCount = 0
@@ -22,6 +24,27 @@ export async function GET(request: NextRequest) {
 
     for (const subscription of expiredSubscriptions) {
       try {
+        // Check if user has MT5 setup and delete from MetaCopier first
+        if (subscription.mt5Setup && subscription.mt5Setup.metacopierAccountId) {
+          try {
+            console.log(`Removing MetaCopier account ${subscription.mt5Setup.metacopierAccountId} for user ${subscription.telegramUserId}`)
+            const result = await removeUserMt5Account(
+              subscription.mt5Setup.metacopierAccountId,
+              subscription.mt5Setup.metacopierCopierId || ''
+            )
+
+            if (result.success) {
+              console.log(`Successfully removed MetaCopier account for user ${subscription.telegramUserId}`)
+            } else {
+              console.error(`Failed to remove MetaCopier account for user ${subscription.telegramUserId}: ${result.error}`)
+              // Continue with channel removal even if MetaCopier cleanup fails
+            }
+          } catch (mcError) {
+            console.error(`Failed to delete MetaCopier account for user ${subscription.telegramUserId}:`, mcError)
+            // Continue with channel removal even if MetaCopier cleanup fails
+          }
+        }
+
         // Attempt to ban/remove user from channel
         const banned = await banChatMember(subscription.telegramUserId)
 

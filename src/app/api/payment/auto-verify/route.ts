@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
 import { sendMessage, createInviteLink, unbanChatMember, formatDate } from '@/lib/telegram'
 import { PLANS, PlanType, calculateExpiryDate } from '@/lib/config'
+import { setConversationState } from '@/lib/conversation-state'
 
 /**
  * POST /api/payment/auto-verify
@@ -189,11 +190,76 @@ Click the link to join the channel. The link can only be used once.
 Type /status anytime to check your subscription.`
 
     if (PLANS[planType].hasCopierAccess) {
-      message += '\n\n🤖 You also have access to the Auto Copier Bot!'
+      message += `
+
+━━━━━━━━━━━━━━━━━━━
+
+🤖 <b>MT5 AUTO COPIER ACTIVATED!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>CRITICAL REQUIREMENTS:</b>
+
+<b>1. YOUR ACCOUNT MUST BE A CENT ACCOUNT!</b>
+❌ Standard Account - <b>WILL NOT WORK</b>
+✅ Cent Account - <b>REQUIRED</b>
+
+<b>2. SCALING: DISABLED (No Scaling)</b>
+💡 Copy trades exactly as master opens them
+
+<b>3. MAGIC NUMBER: 123456</b>
+🔢 Set this in your MT5 EA settings
+
+<b>4. REGION: LONDON</b>
+🌍 Your copier will use London region
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Copy Settings Explained Simply:</b>
+
+📊 <b>Multiplier (1.0x):</b>
+<i>"Default setting - Copy same size as master"</i>
+
+<b>Examples in baby language:</b>
+• 1.0x = Master opens 0.01 → You open 0.01 ✅
+• 2.0x = Master opens 0.01 → You open 0.02 📈
+• 3.0x = Master opens 0.01 → You open 0.03 🚀
+
+<i>"Higher multiplier = Bigger trades = More profit BUT more risk!"</i>
+
+📏 <b>Max Lot (0.2):</b>
+<i>"Biggest trade we'll copy is 0.2 lots"</i>
+
+🔢 <b>Max Positions (10):</b>
+<i>"Maximum 10 trades at the same time"</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+🎁 <b>DON'T HAVE A HEADWAY ACCOUNT?</b>
+
+Create one here and get <b>$100 BONUS!</b>
+👉 https://headway.partners/user/signup?hwp=82067c
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>To set up your copier, type:</b>
+/mt5setup
+
+Or skip for now - you have access for your full 14 days!`
     }
 
     await sendMessage(telegramId, message)
     console.log(`Invite link sent to telegram user ${telegramId}`)
+
+    // If Premium plan, set conversation state for MT5 setup
+    if (PLANS[planType].hasCopierAccess) {
+      console.log(`[MT5 Setup] Setting conversation state for auto-verified user ${telegramId}`)
+      await setConversationState(telegramId, {
+        step: 'account_number',
+        data: {}
+      })
+      console.log(`[MT5 Setup] Conversation state ready for user ${telegramId}`)
+    }
 
     return NextResponse.json({
       success: true,

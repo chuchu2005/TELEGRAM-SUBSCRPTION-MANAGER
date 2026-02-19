@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember } from '@/lib/telegram'
+import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText } from '@/lib/telegram'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
 import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID } from '@/lib/config'
+import { createMt5Account, updateCopierSettings } from '@/lib/metacopier'
+import { encryptPassword, decryptPassword } from '@/lib/encryption'
+import { setConversationState, getConversationState, clearConversationState, advanceMt5SetupStep, updateConversationData, Mt5SetupStep } from '@/lib/conversation-state'
+import { settingsKeyboard, confirmSetupKeyboard, lotSizeKeyboard, maxLotKeyboard, maxLotTotalKeyboard, maxPositionsKeyboard } from '@/lib/telegram-keyboards'
 import type { TelegramUpdate, TelegramUser } from '@/lib/telegram'
 
 // Telegram file_id for reference.jpg image
@@ -21,6 +25,16 @@ const pendingVerificationUsers = new Map<string, PlanType>()
 
 // Idempotency: Track references currently being processed to prevent duplicates
 const processingReferences = new Set<string>()
+
+// Track pending settings changes (userId -> pending settings)
+const pendingSettingsChanges = new Map<string, {
+  lotSize?: number  // User's desired lot size (we calculate multiplier from this)
+  maxLotSize?: number
+  maximumLot?: number
+  maxOpenPositions?: number
+  copyStopLoss?: boolean
+  copyTakeProfit?: boolean
+}>()
 
 // Promo expiration settings
 const PROMO_EXPIRY_HOURS = 48 // 2 days
@@ -865,6 +879,113 @@ Type /pay to see our regular plans!`)
       return
     }
 
+    // Check for promo codes
+    const promoCode = cleanRef.toUpperCase()
+
+    if (promoCode === 'EXTRA') {
+      // 1 week free access (Basic plan)
+      const days = 7
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + days)
+
+      // Create subscription
+      await prisma.subscription.create({
+        data: {
+          telegramUserId: userId,
+          telegramUsername: user.username,
+          telegramName: user.first_name,
+          paystackRef: cleanRef,
+          amountKobo: 0,
+          planType: 'basic',
+          hasCopierAccess: false,
+          startedAt: new Date(),
+          expiresAt: expiresAt
+        }
+      })
+
+      // Create invite link and add to channel
+      const inviteLink = await createInviteLink()
+
+      await sendMessage(user.id, `🎉 <b>Promo Code Activated!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+✅ <b>EXTRA Promo - 1 Week Free Access!</b>
+
+📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}
+
+━━━━━━━━━━━━━━━━━━━
+
+🔗 <b>Join Channel:</b>
+${inviteLink}
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>Important:</b>
+• Click the link above to join the VIP channel
+• Access valid for 7 days from today
+• Enjoy free VIP signals!
+
+━━━━━━━━━━━━━━━━━━━
+
+Want to extend? Type /pay to see our plans!`)
+
+      processingReferences.delete(cleanRef)
+      return
+    }
+
+    if (promoCode === 'EXTRA2') {
+      // 2 weeks free access (Basic plan)
+      const days = 14
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + days)
+
+      // Create subscription
+      await prisma.subscription.create({
+        data: {
+          telegramUserId: userId,
+          telegramUsername: user.username,
+          telegramName: user.first_name,
+          paystackRef: cleanRef,
+          amountKobo: 0,
+          planType: 'basic',
+          hasCopierAccess: false,
+          startedAt: new Date(),
+          expiresAt: expiresAt
+        }
+      })
+
+      // Create invite link and add to channel
+      const inviteLink = await createInviteLink()
+
+      await sendMessage(user.id, `🎉 <b>Promo Code Activated!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+✅ <b>EXTRA2 Promo - 2 Weeks Free Access!</b>
+
+📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}
+
+━━━━━━━━━━━━━━━━━━━
+
+🔗 <b>Join Channel:</b>
+${inviteLink}
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>Important:</b>
+• Click the link above to join the VIP channel
+• Access valid for 14 days from today
+• Enjoy free VIP signals!
+
+━━━━━━━━━━━━━━━━━━━
+
+Want to extend? Type /pay to see our plans!`)
+
+      processingReferences.delete(cleanRef)
+      return
+    }
+
     // Verify transaction with Paystack
     const verification = await verifyTransaction(cleanRef)
 
@@ -1095,10 +1216,82 @@ Click the link to join the channel. The link can only be used once.
 Type /status anytime to check your subscription.`
 
     if (PLANS[planType].hasCopierAccess) {
-      successMessage += '\n\n🤖 You also have access to the Auto Copier Bot!'
+      successMessage += `
+
+━━━━━━━━━━━━━━━━━━━
+
+🤖 <b>MT5 AUTO COPIER ACTIVATED!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>CRITICAL REQUIREMENTS:</b>
+
+<b>1. YOUR ACCOUNT MUST BE A CENT ACCOUNT!</b>
+❌ Standard Account - <b>WILL NOT WORK</b>
+✅ Cent Account - <b>REQUIRED</b>
+
+<b>2. SCALING: DISABLED (No Scaling)</b>
+💡 Copy trades exactly as master opens them
+
+<b>3. MAGIC NUMBER: 123456</b>
+🔢 Set this in your MT5 EA settings
+
+<b>4. REGION: LONDON</b>
+🌍 Your copier will use London region
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Copy Settings Explained Simply:</b>
+
+📊 <b>Multiplier (1.0x):</b>
+<i>"Default setting - Copy same size as master"</i>
+
+<b>Examples in baby language:</b>
+• 1.0x = Master opens 0.01 → You open 0.01 ✅
+• 2.0x = Master opens 0.01 → You open 0.02 📈
+• 3.0x = Master opens 0.01 → You open 0.03 🚀
+
+<i>"Higher multiplier = Bigger trades = More profit BUT more risk!"</i>
+
+📏 <b>Max Lot (0.2):</b>
+<i>"Biggest trade we'll copy is 0.2 lots"</i>
+
+🔢 <b>Max Positions (10):</b>
+<i>"Maximum 10 trades at the same time"</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+🎁 <b>DON'T HAVE A HEADWAY ACCOUNT?</b>
+
+Create one here and get <b>$100 BONUS!</b>
+👉 https://headway.partners/user/signup?hwp=82067c
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>To set up your copier, type:</b>
+/mt5setup
+
+Or skip for now - you have access for your full 14 days!`
     }
 
     await sendMessage(user.id, successMessage)
+
+    // If Premium plan, trigger MT5 setup flow
+    console.log(`[MT5 Setup Check] PlanType: ${planType}, hasCopierAccess: ${PLANS[planType].hasCopierAccess}`)
+
+    if (PLANS[planType].hasCopierAccess) {
+      console.log(`[MT5 Setup] Starting MT5 setup flow for user ${userId}`)
+
+      // Auto-start the setup flow
+      await setConversationState(userId, {
+        step: 'account_number',
+        data: {}
+      })
+
+      console.log(`[MT5 Setup] Conversation state set for user ${userId}`)
+    } else {
+      console.log(`[MT5 Setup] Plan ${planType} does not have copier access. Skipping MT5 setup.`)
+    }
   } finally {
     // Always remove from processing set (idempotency cleanup)
     processingReferences.delete(cleanRef)
@@ -1157,7 +1350,1252 @@ async function handleUnknown(user: TelegramUser): Promise<void> {
 /verify_monthly REF - Verify Monthly plan payment
 /verify_premium REF - Verify Premium plan payment
 /status - Check your subscription
+/mt5setup - Setup MT5 copier (Premium only)
+/settings - Configure copier settings (Premium only)
+/mystats - View copier status (Premium only)
 /help - Get help`)
+}
+
+/**
+ * Handle /mt5setup command - Start MT5 account setup flow
+ */
+async function handleMt5Setup(user: TelegramUser): Promise<void> {
+  const userId = user.id.toString()
+
+  console.log(`[/mt5setup] Command triggered by user ${userId}`)
+
+  // Check if user has active Premium subscription with copier access
+  const subscription = await prisma.subscription.findFirst({
+    where: {
+      telegramUserId: userId,
+      isRemoved: false,
+      expiresAt: { gte: new Date() },
+      hasCopierAccess: true
+    },
+    include: { mt5Setup: true },
+    orderBy: { createdAt: 'desc' }
+  })
+
+  console.log(`[/mt5setup] Subscription found: ${!!subscription}, hasMt5Setup: ${!!subscription?.mt5Setup}`)
+
+  if (!subscription) {
+    // Check if they ever had a Premium subscription that expired
+    const expiredSub = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        hasCopierAccess: true,
+        isRemoved: false
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (expiredSub && expiredSub.expiresAt < new Date()) {
+      // They had Premium but it expired
+      const daysSinceExpiry = Math.floor((Date.now() - expiredSub.expiresAt.getTime()) / (1000 * 60 * 60 * 24))
+
+      console.log(`[/mt5setup] User ${userId} has expired Premium subscription (${daysSinceExpiry} days ago)`)
+      await sendMessage(user.id, `❌ <b>Your Premium Subscription Has Expired</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Your Premium subscription expired ${daysSinceExpiry === 0 ? 'today' : daysSinceExpiry === 1 ? 'yesterday' : `${daysSinceExpiry} days ago`}.
+
+The MT5 Auto Copier is only available for active Premium subscribers.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Want to renew?</b>
+Type /pay to see our Premium plan (₦22,000)
+
+Your subscription will be extended from today!`)
+    } else {
+      // They never had Premium
+      console.log(`[/mt5setup] No Premium subscription found for user ${userId}`)
+      await sendMessage(user.id, `❌ <b>MT5 Setup Not Available</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+The MT5 Auto Copier is only available for Premium subscribers.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Want to upgrade?</b>
+Type /pay to see our Premium plan (₦22,000)`)
+    }
+    return
+  }
+
+  // Check if already set up
+  if (subscription.mt5Setup && subscription.mt5Setup.setupStatus === 'active') {
+    console.log(`[/mt5setup] User ${userId} already has active MT5 setup`)
+    await sendMessage(user.id, `✅ <b>MT5 Already Set Up!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Your copier is already active!
+
+<b>Current Settings:</b>
+📊 Multiplier: ${subscription.mt5Setup.copierMultiplier}x
+📏 Max Lot: ${subscription.mt5Setup.maxLotSize}
+🔢 Max Positions: ${subscription.mt5Setup.maxOpenPositions}
+
+━━━━━━━━━━━━━━━━━━━
+
+Use /settings to modify your copier settings.`)
+    return
+  }
+
+  // Start MT5 setup flow
+  console.log(`[/mt5setup] Starting MT5 setup flow for user ${userId}`)
+  await setConversationState(userId, {
+    step: 'account_number',
+    data: {}
+  })
+
+  await sendMessage(user.id, `🤖 <b>MT5 Auto Copier Setup</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Let's set up your MT5 account to automatically copy our trades!
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>IMPORTANT REQUIREMENTS:</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>1. YOUR ACCOUNT MUST BE A CENT ACCOUNT!</b>
+❌ Standard Account - <b>WILL NOT WORK</b>
+✅ Cent Account - <b>REQUIRED</b>
+
+<b>2. SCALING: DISABLED (No Scaling)</b>
+💡 Copy trades exactly as master opens them
+
+<b>3. MAGIC NUMBER: 123456</b>
+🔢 Set this in your MT5 EA settings
+
+<b>4. BROKER: HEADWAY</b>
+🏢 Your account must be with Headway
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Server:</b> headway-real
+<b>Region:</b> London
+<b>Account Type:</b> MT5
+
+━━━━━━━━━━━━━━━━━━━
+
+🎁 <b>DON'T HAVE A HEADWAY ACCOUNT?</b>
+
+Create one here and get <b>$100 BONUS!</b>
+👉 https://headway.partners/user/signup?hwp=82067c
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Step 1 of 2:</b>
+Please send your MT5 account number:
+
+<i>Example: 123456789</i>
+
+Make sure it's a <b>CENT ACCOUNT</b>!`)
+
+  console.log(`[/mt5setup] Setup message sent to user ${userId}`)
+}
+
+/**
+ * Handle /settings command - Configure copier settings
+ */
+async function handleSettings(user: TelegramUser): Promise<void> {
+  const userId = user.id.toString()
+
+  // Check if user has active Premium subscription with MT5 setup
+  const subscription = await prisma.subscription.findFirst({
+    where: {
+      telegramUserId: userId,
+      isRemoved: false,
+      expiresAt: { gte: new Date() },
+      hasCopierAccess: true
+    },
+    include: { mt5Setup: true },
+    orderBy: { createdAt: 'desc' }
+  })
+
+  if (!subscription || !subscription.mt5Setup || subscription.mt5Setup.setupStatus !== 'active') {
+    await sendMessage(user.id, `❌ <b>Settings Not Available</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+You need to complete MT5 setup first.
+
+Use /mt5setup to get started.`)
+    return
+  }
+
+  // Display settings menu
+  await sendMessageWithKeyboard(
+    user.id,
+    `⚙️ <b>Copier Settings</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Configure your trade copying settings:
+
+━━━━━━━━━━━━━━━━━━━`,
+    settingsKeyboard({
+      copierMultiplier: subscription.mt5Setup.copierMultiplier,
+      lotSize: subscription.mt5Setup.lotSize || 0.01,
+      maxLotSize: subscription.mt5Setup.maxLotSize,
+      maximumLot: subscription.mt5Setup.maximumLot || 0.2,
+      maxOpenPositions: subscription.mt5Setup.maxOpenPositions,
+      copyStopLoss: subscription.mt5Setup.copyStopLoss,
+      copyTakeProfit: subscription.mt5Setup.copyTakeProfit
+    })
+  )
+}
+
+/**
+ * Handle /mystats command - View copier status
+ */
+async function handleMyStats(user: TelegramUser): Promise<void> {
+  const userId = user.id.toString()
+
+  const subscription = await prisma.subscription.findFirst({
+    where: {
+      telegramUserId: userId,
+      isRemoved: false,
+      expiresAt: { gte: new Date() },
+      hasCopierAccess: true
+    },
+    include: { mt5Setup: true },
+    orderBy: { createdAt: 'desc' }
+  })
+
+  if (!subscription || !subscription.mt5Setup) {
+    await sendMessage(user.id, `❌ No MT5 setup found.
+
+Use /mt5setup to get started.`)
+    return
+  }
+
+  const mt5 = subscription.mt5Setup
+  const statusEmoji = mt5.setupStatus === 'active' ? '✅' : mt5.setupStatus === 'pending' ? '⏳' : '❌'
+
+  await sendMessage(user.id, `${statusEmoji} <b>MT5 Copier Status</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Account:</b> ${mt5.loginAccountNumber}
+<b>Server:</b> ${mt5.loginServer}
+<b>Region:</b> ${mt5.regionId === 2 ? 'London' : `Region ${mt5.regionId}`}
+<b>Status:</b> ${mt5.setupStatus.toUpperCase()}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Copy Settings:</b>
+📊 Multiplier: ${mt5.copierMultiplier}x
+📏 Max Lot: ${mt5.maxLotSize}
+🔢 Max Positions: ${mt5.maxOpenPositions}
+🛑 Copy SL: ${mt5.copyStopLoss ? '✅' : '❌'}
+🎯 Copy TP: ${mt5.copyTakeProfit ? '✅' : '❌'}
+
+━━━━━━━━━━━━━━━━━━━
+
+Use /settings to modify.`)
+}
+
+/**
+ * Handle /remove_copier command - Remove MT5 account from MetaCopier
+ */
+async function handleRemoveCopier(user: TelegramUser): Promise<void> {
+  const userId = user.id.toString()
+
+  // Check if user has active Premium subscription with MT5 setup
+  const subscription = await prisma.subscription.findFirst({
+    where: {
+      telegramUserId: userId,
+      isRemoved: false,
+      expiresAt: { gte: new Date() },
+      hasCopierAccess: true
+    },
+    include: { mt5Setup: true },
+    orderBy: { createdAt: 'desc' }
+  })
+
+  if (!subscription || !subscription.mt5Setup) {
+    await sendMessage(user.id, `❌ <b>No Copier Found</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+You don't have an active MT5 copier setup.
+
+Use /mt5setup to set up a new copier.`)
+    return
+  }
+
+  const mt5 = subscription.mt5Setup
+
+  // Check if MetaCopier account exists
+  if (!mt5.metacopierAccountId) {
+    await sendMessage(user.id, `❌ <b>No MetaCopier Account</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Your MT5 setup doesn't have a MetaCopier account to remove.
+
+Contact support if this is an error.`)
+    return
+  }
+
+  try {
+    console.log(`[Remove Copier] Auto-deleting database record and notifying admin for user ${userId}`)
+
+    // Store details before deletion
+    const accountNumber = mt5.loginAccountNumber
+    const metaCopierAccountId = mt5.metacopierAccountId
+    const metaCopierCopierId = mt5.metacopierCopierId
+    const lotSize = mt5.lotSize
+    const maxPositions = mt5.maxOpenPositions
+    const planType = subscription.planType
+    const expiryDate = subscription.expiresAt.toLocaleDateString()
+    const amount = `₦${(subscription.amountKobo / 100).toLocaleString()}`
+    const mt5SetupId = mt5.id
+
+    // Delete from database immediately
+    await prisma.mt5Setup.delete({
+      where: { id: mt5.id }
+    })
+
+    console.log(`[Remove Copier] Database record deleted for user ${userId}, account ${accountNumber}`)
+
+    // Send message to admin with account details for manual MetaCopier deletion
+    await sendMessage(ADMIN_ID, `🗑️ <b>Copier Removal Request - Database Deleted</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>User Details:</b>
+👤 Name: ${user.first_name || user.username || 'Unknown'}
+🆔 Telegram ID: ${userId}
+📝 Username: @${user.username || 'N/A'}
+
+<b>MT5 Account Details:</b>
+📊 Account Number: ${accountNumber}
+🔹 MetaCopier Account ID: ${metaCopierAccountId}
+🔸 MetaCopier Copier ID: ${metaCopierCopierId || 'N/A'}
+💾 Lot Size: ${lotSize}
+📈 Max Positions: ${maxPositions}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Subscription Info:</b>
+📅 Plan: ${planType}
+⏰ Expires: ${expiryDate}
+💰 Amount: ${amount}
+
+━━━━━━━━━━━━━━━━━━━
+
+✅ <b>Database record auto-deleted</b>
+⚠️ <b>Action Required:</b> Please manually delete from MetaCopier website
+
+MetaCopier: https://metacopier.io`)
+
+    // Send confirmation to user
+    await sendMessage(user.id, `✅ <b>Copier Removed Successfully</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Your MT5 copier account has been successfully deleted.
+
+<b>Account:</b> ${accountNumber}
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>Important:</b>
+• Your copier has been removed from our system
+• Copying trades has been stopped
+• Your Premium subscription remains active
+
+You can set up a new copier anytime using /mt5setup`)
+
+    console.log(`[Remove Copier] Completed removal for user ${userId}, account ${accountNumber}`)
+  } catch (error) {
+    console.error(`[Remove Copier] Error during removal for user ${userId}:`, error)
+    await sendMessage(user.id, `❌ <b>Failed to Remove Copier</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+There was an error removing your copier.
+
+Please try again or contact support directly.`)
+  }
+}
+
+/**
+ * Handle MT5 setup conversation flow
+ */
+async function handleMt5Conversation(user: TelegramUser, text: string): Promise<void> {
+  const userId = user.id.toString()
+  const state = await getConversationState(userId)
+
+  if (!state) {
+    return // Not in MT5 setup flow
+  }
+
+  const trimmedText = text.trim()
+
+  switch (state.step) {
+    case 'account_number':
+      // Validate account number (8-12 digits)
+      if (!/^\d{8,12}$/.test(trimmedText)) {
+        await sendMessage(user.id, `❌ Invalid account number!
+
+Please send a valid MT5 account number (8-12 digits).
+
+<i>Example: 123456789</i>`)
+        return
+      }
+
+      await updateConversationData(userId, { accountNumber: trimmedText })
+      await advanceMt5SetupStep(userId)
+
+      await sendMessage(user.id, `✅ Account number saved!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Step 2 of 2:</b>
+Please send your MT5 password:
+
+<i>This will be encrypted and stored securely.</i>
+
+⚠️ Make sure this is a <b>CENT ACCOUNT</b> password!`)
+      break
+
+    case 'password':
+      if (trimmedText.length < 4) {
+        await sendMessage(user.id, `❌ Password too short!
+
+Please send your valid MT5 password.`)
+        return
+      }
+
+      await updateConversationData(userId, { password: trimmedText })
+
+      // Auto-set server to headway-real
+      const defaultServer = 'headway-real'
+      await updateConversationData(userId, { server: defaultServer })
+      await advanceMt5SetupStep(userId) // This will move to 'confirming' step
+
+      // Show confirmation
+      const finalState = await getConversationState(userId)
+      if (finalState) {
+        await sendMessageWithKeyboard(
+          user.id,
+          `✅ <b>Confirm MT5 Setup</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Account:</b> ${finalState.data.accountNumber}
+<b>Server:</b> ${defaultServer}
+<b>Region:</b> London
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>DOUBLE-CHECK BEFORE CONFIRMING:</b>
+
+✅ Is this a <b>CENT ACCOUNT</b>?
+✅ Magic Number set to <b>123456</b>?
+✅ Scaling is <b>DISABLED</b>?
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Copy Settings (Simple Terms):</b>
+
+📊 <b>Lot Size (0.01):</b>
+<i>"When master opens 0.01, you also open 0.01"</i>
+
+<b>Want bigger trades?</b>
+• 0.01 = Same size as master (safe) ✅
+• 0.02 = Double the size (more profit) 📈
+• 0.03 = Triple the size (higher risk) 🚀
+
+<b>Change anytime with /settings!</b>
+
+📏 <b>Max Lot Per Trade (0.02):</b>
+<i>"Biggest trade we'll copy is 0.02 lots"</i>
+
+🔢 <b>Max Positions (10):</b>
+<i>"Maximum 10 trades open at same time"</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+🎁 <b>DON'T HAVE A HEADWAY ACCOUNT?</b>
+
+Create one here and get <b>$100 BONUS!</b>
+👉 https://headway.partners/user/signup?hwp=82067c
+
+━━━━━━━━━━━━━━━━━━━
+
+Please confirm to activate your copier:`,
+          confirmSetupKeyboard()
+        )
+      }
+      break
+
+    case 'confirming':
+      await sendMessage(user.id, `⏳ Please use the buttons to confirm or cancel.`)
+      break
+  }
+}
+
+/**
+ * Process MT5 setup and create MetaCopier account
+ */
+async function processMt5Setup(user: TelegramUser): Promise<boolean> {
+  const userId = user.id.toString()
+  const state = await getConversationState(userId)
+
+  // Debug logging
+  console.log(`[MT5 Setup] Processing for user ${userId}`)
+  console.log(`[MT5 Setup] State exists: ${!!state}`)
+  if (state) {
+    console.log(`[MT5 Setup] Step: ${state.step}`)
+    console.log(`[MT5 Setup] Has accountNumber: ${!!state.data.accountNumber}`)
+    console.log(`[MT5 Setup] Has password: ${!!state.data.password}`)
+    console.log(`[MT5 Setup] Has server: ${!!state.data.server}`)
+  }
+
+  if (!state || !state.data.accountNumber || !state.data.password || !state.data.server) {
+    await sendMessage(user.id, `❌ <b>Setup session expired!</b>
+
+This happens when:
+• The server restarted
+• Too much time passed between steps
+
+<b>Please start fresh:</b>
+/mt5setup
+
+💡 <i>Tip: Complete all steps within 5 minutes to avoid timeout.</i>`)
+    await clearConversationState(userId)
+    return false
+  }
+
+  try {
+    // Get user's subscription
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        isRemoved: false,
+        expiresAt: { gte: new Date() },
+        hasCopierAccess: true
+      },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (!subscription) {
+      await sendMessage(user.id, `❌ No active Premium subscription found.`)
+      await clearConversationState(userId)
+      return false
+    }
+
+    await sendMessage(user.id, `⏳ Creating your MetaCopier account...
+This may take 10-20 seconds.`)
+
+    // Create MetaCopier account
+    const mcAccount = await createMt5Account({
+      loginAccountNumber: state.data.accountNumber,
+      loginAccountPassword: state.data.password,
+      loginServer: state.data.server,
+      region: { id: 2 }, // 2 = London region in MetaCopier
+      type: { id: 1 }    // 1 = MT5 account type in MetaCopier
+    })
+
+    // Encrypt password
+    const encryptedPassword = encryptPassword(state.data.password)
+
+    // Save to database
+    await prisma.mt5Setup.create({
+      data: {
+        subscriptionId: subscription.id,
+        loginAccountNumber: state.data.accountNumber,
+        loginAccountPassword: encryptedPassword,
+        loginServer: state.data.server,
+        regionId: 2, // London region ID in MetaCopier
+        metacopierAccountId: mcAccount.accountId,
+        metacopierCopierId: mcAccount.copierId,
+        setupStatus: 'active'
+      }
+    })
+
+    // Clear conversation state
+    await clearConversationState(userId)
+
+    await sendMessage(user.id, `✅ <b>Copier Activated Successfully!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Your MT5 account is now copying our master trades!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Account:</b> ${state.data.accountNumber}
+<b>Server:</b> ${state.data.server}
+<b>Region:</b> London
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>IMPORTANT - VERIFY YOUR MT5 SETTINGS:</b>
+
+✅ Account Type: <b>CENT ACCOUNT</b>
+✅ Scaling: <b>DISABLED</b> (No Scaling)
+✅ Magic Number: <b>123456</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Your Copy Settings:</b>
+
+📊 <b>Lot Size: 0.01</b>
+<i>"When master opens 0.01 lots, you also open 0.01 lots"</i>
+
+<b>Want to increase your lot size?</b>
+• 0.01 = Copy same size as master (safe) ✅
+• 0.02 = Double the size (more profit, more risk) 📈
+• 0.03 = Triple the size (higher risk) 🚀
+
+<b>Change anytime with /settings!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+📏 <b>Max Lot Per Trade: 0.02</b>
+<i>"Biggest trade we'll copy is 0.02 lots"</i>
+
+🔢 <b>Max Positions: 10</b>
+<i>"Maximum 10 trades at the same time"</i>
+
+🛑 Copy SL: ✅
+🎯 Copy TP: ✅
+
+━━━━━━━━━━━━━━━━━━━
+
+Use /settings to modify your settings anytime!
+Use /mystats to view your copier status!`)
+
+    return true
+  } catch (error) {
+    console.error('Error processing MT5 setup:', error)
+
+    // Check for specific error types
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    let userMessage = ''
+
+    if (errorMessage.includes('LOGIN_SERVER_NOT_FOUND')) {
+      userMessage = `❌ <b>Server Not Found!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>The MT5 server name you entered doesn't exist.</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Common server names:</b>
+
+<b>Headway:</b>
+<code>headway-real</code>
+
+<b>Exness:</b>
+<code>Exness-MT5Real</code>
+
+<b>IC Markets:</b>
+<code>ICMarketsSC-MT5</code>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>How to find your server:</b>
+1. Open your MT5 terminal
+2. Click <b>File → Login → Trade</b> tab
+3. Copy the server name exactly as shown
+
+━━━━━━━━━━━━━━━━━━━
+
+Type /mt5setup to try again.`
+    } else if (errorMessage.includes('authentication') || errorMessage.includes('credentials') || errorMessage.includes('unauthorized') || errorMessage.includes('401') || errorMessage.includes('403')) {
+      userMessage = `❌ <b>Invalid MT5 Credentials!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>The password or account number is incorrect.</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Please double-check:</b>
+• MT5 account number is correct
+• MT5 password is correct
+• Account is a <b>CENT ACCOUNT</b>
+• Server is: MT5 | Headway-Live
+
+━━━━━━━━━━━━━━━━━━━
+
+Type /mt5setup to try again.`
+    } else if (errorMessage.includes('connection') || errorMessage.includes('timeout') || errorMessage.includes('network')) {
+      userMessage = `❌ <b>Connection Error!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Could not connect to your MT5 account.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Possible reasons:</b>
+• MT5 account is not active
+• Server connection issue
+• Account is blocked/locked
+
+━━━━━━━━━━━━━━━━━━━
+
+Please check your account and try again with /mt5setup.`
+    } else if (errorMessage.includes('exists') || errorMessage.includes('already')) {
+      userMessage = `❌ <b>Account Already Exists!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+This MT5 account is already set up for copying.
+
+━━━━━━━━━━━━━━━━━━━
+
+Use /settings to modify your copier settings.`
+    } else {
+      userMessage = `❌ <b>Setup Failed!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+${errorMessage}
+
+━━━━━━━━━━━━━━━━━━━
+
+Please check your credentials and try again with /mt5setup`
+    }
+
+    await sendMessage(user.id, userMessage)
+    await clearConversationState(userId)
+    return false
+  }
+}
+
+/**
+ * Handle callback queries for MT5 setup flow
+ */
+async function handleMt5Callback(user: TelegramUser, callbackId: string, data: string, messageId?: number): Promise<void> {
+  const userId = user.id.toString()
+
+  // MT5 Setup callbacks
+  if (data === 'mt5_confirm') {
+    await answerCallbackQuery(callbackId, 'Setting up your copier...')
+    await processMt5Setup(user)
+  }
+  else if (data === 'mt5_cancel' || data === 'mt5_skip') {
+    await answerCallbackQuery(callbackId, 'Setup cancelled')
+    await clearConversationState(userId)
+    await sendMessage(user.id, `❌ Setup cancelled.
+
+You can start anytime with /mt5setup`)
+  }
+  // Settings callbacks
+  else if (data === 'settings_lotsize') {
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        hasCopierAccess: true,
+        isRemoved: false,
+        expiresAt: { gte: new Date() }
+      },
+      include: { mt5Setup: true },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (subscription?.mt5Setup) {
+      await answerCallbackQuery(callbackId)
+      if (messageId) {
+        const currentLotSize = subscription.mt5Setup.lotSize || 0.01
+        const maxPositions = subscription.mt5Setup.maxOpenPositions || 10
+        const totalExposure = (currentLotSize * maxPositions).toFixed(2)
+
+        await editMessageText(
+          user.id,
+          messageId,
+          `📊 <b>Select Your Lot Size</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>This is the lot size you want to copy:</b>
+
+When master opens a trade, your account will copy it with this lot size.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Examples:</b>
+
+• <b>0.01</b> - Copy same size as master (safe) ✅
+• <b>0.02</b> - Double the master's size (more profit, more risk) 📈
+• <b>0.03</b> - Triple the master's size (higher risk) 🚀
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Your Current Settings:</b>
+
+📊 Lot Size: <b>${currentLotSize}</b>
+🔢 Max Positions: <b>${maxPositions}</b>
+📊 <b>Total Exposure: ${totalExposure} lots</b>
+
+<i>"If all ${maxPositions} trades open at once"</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Current: ${currentLotSize}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Select a new lot size:`,
+          lotSizeKeyboard(currentLotSize)
+        )
+      }
+    }
+  }
+  else if (data.startsWith('lotsize_')) {
+    const value = parseFloat(data.split('_')[1])
+    // Calculate multiplier: if user wants 0.02 lots and master uses 0.01, multiplier is 2.0
+    const calculatedMultiplier = value / 0.01
+    await answerCallbackQuery(callbackId, `Lot size set to ${value} lots`)
+
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        hasCopierAccess: true,
+        isRemoved: false,
+        expiresAt: { gte: new Date() }
+      },
+      include: { mt5Setup: true },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (subscription?.mt5Setup && messageId) {
+      // Store pending change - we store lotSize, but will calculate multiplier when saving
+      const current = pendingSettingsChanges.get(userId) || {}
+      pendingSettingsChanges.set(userId, { ...current, lotSize: value })
+
+      const maxPositions = subscription.mt5Setup.maxOpenPositions || 10
+      const totalExposure = (value * maxPositions).toFixed(2)
+
+      // Update in-memory state (not saved until user clicks Save)
+      await editMessageText(
+        user.id,
+        messageId,
+        `📊 <b>Select Your Lot Size</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Selected: ${value} lots</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>📊 What This Means:</b>
+
+When master opens 0.01 lots, you'll open ${value} lots.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Your Total Exposure:</b>
+
+📊 Lot Size: <b>${value}</b>
+🔢 Max Positions: <b>${maxPositions}</b>
+📊 <b>Total: ${totalExposure} lots</b>
+
+<i>"If all ${maxPositions} trades open at once"</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Risk Warning:</b>
+
+Higher total exposure = Higher risk!
+Make sure you can handle ${totalExposure} lots total.
+
+━━━━━━━━━━━━━━━━━━━
+
+Click Save to apply changes.`,
+        lotSizeKeyboard(value)
+      )
+    }
+  }
+  else if (data === 'settings_maxlot') {
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        hasCopierAccess: true,
+        isRemoved: false,
+        expiresAt: { gte: new Date() }
+      },
+      include: { mt5Setup: true },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (subscription?.mt5Setup) {
+      await answerCallbackQuery(callbackId)
+      if (messageId) {
+        await editMessageText(
+          user.id,
+          messageId,
+          `📏 <b>Max Lot Per Trade</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>What is Max Lot Per Trade?</b>
+
+This limits the size of EACH individual trade copied.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Examples (with 1.0x multiplier):</b>
+
+<i>If master opens 0.01 lots:</i>
+• Max 0.01 → Copies 0.01 ✅
+• Max 0.05 → Copies 0.01 ✅
+
+<i>If master opens 0.10 lots:</i>
+• Max 0.01 → Copies 0.01 📉
+• Max 0.05 → Copies 0.05 📏
+• Max 0.10 → Copies 0.10 ✅
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Current: ${subscription.mt5Setup.maxLotSize}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Select a new limit:`,
+          maxLotKeyboard(subscription.mt5Setup.maxLotSize)
+        )
+      }
+    }
+  }
+  else if (data.startsWith('maxlot_')) {
+    const value = parseFloat(data.split('_')[1])
+    await answerCallbackQuery(callbackId, `Max lot per trade set to ${value}`)
+
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        hasCopierAccess: true,
+        isRemoved: false,
+        expiresAt: { gte: new Date() }
+      },
+      include: { mt5Setup: true },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (subscription?.mt5Setup && messageId) {
+      // Store pending change
+      const current = pendingSettingsChanges.get(userId) || {}
+      pendingSettingsChanges.set(userId, { ...current, maxLotSize: value })
+
+      await editMessageText(
+        user.id,
+        messageId,
+        `📏 <b>Max Lot Per Trade</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Selected: ${value}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Click Save to apply changes.`,
+        maxLotKeyboard(value)
+      )
+    }
+  }
+  else if (data === 'settings_maxlot_total') {
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        hasCopierAccess: true,
+        isRemoved: false,
+        expiresAt: { gte: new Date() }
+      },
+      include: { mt5Setup: true },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (subscription?.mt5Setup) {
+      await answerCallbackQuery(callbackId)
+      if (messageId) {
+        await editMessageText(
+          user.id,
+          messageId,
+          `📊 <b>Max Total Exposure</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>What is Max Total Exposure?</b>
+
+This is the MAXIMUM TOTAL lots you can have across ALL open trades combined.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Examples:</b>
+
+<i>If you have 10 open trades:</i>
+• Max 0.1 → Each trade = 0.01 lots
+• Max 0.5 → Each trade = 0.05 lots
+• Max 1.0 → Each trade = 0.10 lots
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>💡 Risk Management:</b>
+
+Lower total exposure = Lower risk but less profit potential
+Higher total exposure = Higher risk but more profit potential
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Current: ${subscription.mt5Setup.maximumLot || 0.2}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Select a new limit:`,
+          maxLotTotalKeyboard(subscription.mt5Setup.maximumLot || 0.2)
+        )
+      }
+    }
+  }
+  else if (data.startsWith('maxlot_total_')) {
+    const value = parseFloat(data.split('_')[2])
+    await answerCallbackQuery(callbackId, `Max total exposure set to ${value}`)
+
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        hasCopierAccess: true,
+        isRemoved: false,
+        expiresAt: { gte: new Date() }
+      },
+      include: { mt5Setup: true },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (subscription?.mt5Setup && messageId) {
+      // Store pending change
+      const current = pendingSettingsChanges.get(userId) || {}
+      pendingSettingsChanges.set(userId, { ...current, maximumLot: value })
+
+      await editMessageText(
+        user.id,
+        messageId,
+        `📊 <b>Max Total Exposure</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Selected: ${value}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Click Save to apply changes.`,
+        maxLotTotalKeyboard(value)
+      )
+    }
+  }
+  else if (data === 'settings_maxpositions') {
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        hasCopierAccess: true,
+        isRemoved: false,
+        expiresAt: { gte: new Date() }
+      },
+      include: { mt5Setup: true },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (subscription?.mt5Setup) {
+      await answerCallbackQuery(callbackId)
+      if (messageId) {
+        await editMessageText(
+          user.id,
+          messageId,
+          `🔢 <b>Max Open Positions</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>What is Max Open Positions?</b>
+
+This is the maximum NUMBER of trades you can have open at the same time.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Examples:</b>
+
+Max 3 positions:
+• You can copy up to 3 trades at once
+• 4th trade won't be copied until one closes
+
+Max 10 positions:
+• You can copy up to 10 trades at once
+• Good for active trading strategies
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Current: ${subscription.mt5Setup.maxOpenPositions}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Select a new limit:`,
+          maxPositionsKeyboard(subscription.mt5Setup.maxOpenPositions)
+        )
+      }
+    }
+  }
+  else if (data.startsWith('maxpositions_')) {
+    const value = parseInt(data.split('_')[1])
+    await answerCallbackQuery(callbackId, `Max positions set to ${value}`)
+
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        hasCopierAccess: true,
+        isRemoved: false,
+        expiresAt: { gte: new Date() }
+      },
+      include: { mt5Setup: true },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (subscription?.mt5Setup && messageId) {
+      // Store pending change
+      const current = pendingSettingsChanges.get(userId) || {}
+      pendingSettingsChanges.set(userId, { ...current, maxOpenPositions: value })
+
+      await editMessageText(
+        user.id,
+        messageId,
+        `🔢 <b>Max Open Positions</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Selected: ${value}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Click Save to apply changes.`,
+        maxPositionsKeyboard(value)
+      )
+    }
+  }
+  else if (data === 'settings_save') {
+    // Get pending settings
+    const pending = pendingSettingsChanges.get(userId)
+
+    if (!pending || Object.keys(pending).length === 0) {
+      await answerCallbackQuery(callbackId, 'No changes to save')
+      await sendMessage(user.id, `ℹ️ No changes to save.
+
+Use /settings to modify your copier settings.`)
+      return
+    }
+
+    try {
+      // Get user's subscription and MT5 setup
+      const subscription = await prisma.subscription.findFirst({
+        where: {
+          telegramUserId: userId,
+          hasCopierAccess: true,
+          isRemoved: false,
+          expiresAt: { gte: new Date() }
+        },
+        include: { mt5Setup: true },
+        orderBy: { createdAt: 'desc' }
+      })
+
+      if (!subscription?.mt5Setup || !subscription.mt5Setup.metacopierAccountId || !subscription.mt5Setup.metacopierCopierId) {
+        await answerCallbackQuery(callbackId, '❌ No copier found')
+        await sendMessage(user.id, `❌ No active copier found.
+
+Please complete MT5 setup first with /mt5setup`)
+        pendingSettingsChanges.delete(userId)
+        return
+      }
+
+      await answerCallbackQuery(callbackId, 'Saving settings...')
+
+      // Calculate multiplier from lotSize if lotSize was changed
+      // Master uses 0.01 lot size, so multiplier = userLotSize / 0.01
+      const calculatedMultiplier = pending.lotSize !== undefined
+        ? pending.lotSize / 0.01
+        : subscription.mt5Setup.copierMultiplier
+
+      // Build update params with current values + pending changes
+      const updateParams = {
+        accountId: subscription.mt5Setup.metacopierAccountId,
+        copierId: subscription.mt5Setup.metacopierCopierId,
+        multiplier: calculatedMultiplier,
+        maxLotSize: pending.maxLotSize ?? subscription.mt5Setup.maxLotSize,
+        maximumLot: pending.maximumLot ?? subscription.mt5Setup.maximumLot,
+        maxOpenPositions: pending.maxOpenPositions ?? subscription.mt5Setup.maxOpenPositions,
+        copyStopLoss: pending.copyStopLoss ?? subscription.mt5Setup.copyStopLoss,
+        copyTakeProfit: pending.copyTakeProfit ?? subscription.mt5Setup.copyTakeProfit
+      }
+
+      // Update MetaCopier
+      await updateCopierSettings(updateParams)
+
+      // Update database
+      await prisma.mt5Setup.update({
+        where: { id: subscription.mt5Setup.id },
+        data: {
+          lotSize: pending.lotSize ?? subscription.mt5Setup.lotSize,
+          copierMultiplier: calculatedMultiplier,
+          maxLotSize: updateParams.maxLotSize,
+          maximumLot: updateParams.maximumLot,
+          maxOpenPositions: updateParams.maxOpenPositions,
+          copyStopLoss: updateParams.copyStopLoss,
+          copyTakeProfit: updateParams.copyTakeProfit
+        }
+      })
+
+      // Clear pending settings
+      pendingSettingsChanges.delete(userId)
+
+      await sendMessage(user.id, `✅ <b>Settings Saved Successfully!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Your copier settings have been updated:</b>
+
+${pending.lotSize !== undefined ? `📊 Lot Size: ${pending.lotSize} lots\n` : ''}
+${pending.maxLotSize !== undefined ? `📏 Max Lot Per Trade: ${updateParams.maxLotSize}\n` : ''}
+${pending.maximumLot !== undefined ? `📊 Max Total Exposure: ${updateParams.maximumLot}\n` : ''}
+${pending.maxOpenPositions !== undefined ? `🔢 Max Positions: ${updateParams.maxOpenPositions}\n` : ''}
+
+━━━━━━━━━━━━━━━━━━━
+
+Changes are now active on your MT5 account!
+
+Use /settings to modify anytime.`)
+
+    } catch (error) {
+      console.error('Error saving settings:', error)
+      await answerCallbackQuery(callbackId, '❌ Failed to save')
+      await sendMessage(user.id, `❌ Failed to save settings!
+
+Please try again or contact support if the problem persists.`)
+    }
+  }
+  else if (data === 'settings_cancel') {
+    // Clear pending settings when canceling
+    pendingSettingsChanges.delete(userId)
+    await answerCallbackQuery(callbackId)
+    await handleSettings(user)
+  }
+  else if (data === 'settings_back') {
+    // Don't clear pending settings when going back - just show the menu
+    await answerCallbackQuery(callbackId)
+    await handleSettings(user)
+  }
 }
 
 /**
@@ -1170,10 +2608,16 @@ export async function POST(request: NextRequest) {
     // Handle callback queries (button clicks)
     if (body.callback_query) {
       const { callback_query } = body
-      const { id, from, data } = callback_query
+      const { id, from, data, message } = callback_query
       const userId = from.id.toString()
 
       console.log('Received callback query:', data, 'from user:', userId)
+
+      // Handle MT5 setup and settings callbacks first
+      if (data.startsWith('mt5_') || data.startsWith('settings_') || data.startsWith('lotsize_') || data.startsWith('maxlot_') || data.startsWith('maxpositions_')) {
+        await handleMt5Callback(from, id, data, message?.message_id)
+        return NextResponse.json({ ok: true })
+      }
 
       // Answer the callback query to remove the loading state
       await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
@@ -1285,6 +2729,13 @@ Please enter a valid email address.
 
       // Show payment buttons with the email
       await showPaymentButtons(from, email)
+      return NextResponse.json({ ok: true })
+    }
+
+    // Check if user is in MT5 setup conversation flow
+    const conversationState = await getConversationState(userId)
+    if (conversationState && !command.startsWith('/')) {
+      await handleMt5Conversation(from, text!)
       return NextResponse.json({ ok: true })
     }
 
@@ -1461,6 +2912,33 @@ Or send /cancel to exit.`
         }
         break
 
+      case '/promo':
+        // Usage: /promo EXTRA or /promo EXTRA2
+        if (!args[0]) {
+          await sendMessage(from.id, `🎁 <b>Promo Codes</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Available Promo Codes:</b>
+
+✨ <b>EXTRA</b> - 1 Week Free Access
+✨ <b>EXTRA2</b> - 2 Weeks Free Access
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>How to redeem:</b>
+/promo EXTRA
+or
+/promo EXTRA2
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Redeem now to get free VIP access!</i>`)
+        } else {
+          await handleVerify(from, args[0], 'basic')
+        }
+        break
+
       case '/verify_premium':
         // If no reference provided, show instructions
         if (!args[0]) {
@@ -1515,6 +2993,35 @@ Or send /cancel to exit.`
 
       case '/status':
         await handleStatus(from)
+        break
+
+      case '/mt5setup':
+        await handleMt5Setup(from)
+        break
+
+      case '/settings':
+        await handleSettings(from)
+        break
+
+      case '/mystats':
+        await handleMyStats(from)
+        break
+
+      case '/skip':
+        // Skip MT5 setup
+        const skipState = await getConversationState(userId)
+        if (skipState) {
+          await clearConversationState(userId)
+          await sendMessage(from.id, `✅ Setup skipped.
+
+You can start MT5 setup anytime by typing /mt5setup`)
+        } else {
+          await sendMessage(from.id, `Nothing to skip. Type /help to see available commands.`)
+        }
+        break
+
+      case '/remove_copier':
+        await handleRemoveCopier(from)
         break
 
       default:
