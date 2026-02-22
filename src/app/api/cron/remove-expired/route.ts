@@ -11,13 +11,14 @@ export async function GET(request: NextRequest) {
   try {
     // Find all expired subscriptions that haven't been removed yet
     const now = new Date()
-    const expiredSubscriptions = await prisma.subscription.findMany({
+    const query: any = {
       where: {
         expiresAt: { lt: now },
         isRemoved: false
       },
       include: { mt5Setup: true }
-    }) as any
+    }
+    const expiredSubscriptions: any[] = await prisma.subscription.findMany(query)
 
     let removedCount = 0
     let failedCount = 0
