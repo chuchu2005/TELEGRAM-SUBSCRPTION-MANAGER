@@ -883,6 +883,30 @@ Type /pay to see our regular plans!`)
     const promoCode = cleanRef.toUpperCase()
 
     if (promoCode === 'EXTRA') {
+      // Check if user already redeemed this promo code
+      const existingPromo = await prisma.subscription.findFirst({
+        where: {
+          telegramUserId: userId,
+          paystackRef: { equals: cleanRef, mode: 'insensitive' }
+        }
+      })
+
+      if (existingPromo) {
+        await sendMessage(user.id, `❌ <b>Already Redeemed!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+You've already used this promo code!
+
+━━━━━━━━━━━━━━━━━━━
+
+💡 Each promo code can only be used once per user.
+
+Type /pay to see our plans!`)
+        processingReferences.delete(cleanRef)
+        return
+      }
+
       // 1 week free access (Basic plan)
       const days = 7
       const expiresAt = new Date()
@@ -935,6 +959,30 @@ Want to extend? Type /pay to see our plans!`)
     }
 
     if (promoCode === 'EXTRA2') {
+      // Check if user already redeemed this promo code
+      const existingPromo = await prisma.subscription.findFirst({
+        where: {
+          telegramUserId: userId,
+          paystackRef: { equals: cleanRef, mode: 'insensitive' }
+        }
+      })
+
+      if (existingPromo) {
+        await sendMessage(user.id, `❌ <b>Already Redeemed!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+You've already used this promo code!
+
+━━━━━━━━━━━━━━━━━━━
+
+💡 Each promo code can only be used once per user.
+
+Type /pay to see our plans!`)
+        processingReferences.delete(cleanRef)
+        return
+      }
+
       // 2 weeks free access (Basic plan)
       const days = 14
       const expiresAt = new Date()
@@ -976,6 +1024,82 @@ ${inviteLink}
 ⚠️ <b>Important:</b>
 • Click the link above to join the VIP channel
 • Access valid for 14 days from today
+• Enjoy free VIP signals!
+
+━━━━━━━━━━━━━━━━━━━
+
+Want to extend? Type /pay to see our plans!`)
+
+      processingReferences.delete(cleanRef)
+      return
+    }
+
+    if (promoCode === 'VIP') {
+      // Check if user already redeemed this promo code
+      const existingPromo = await prisma.subscription.findFirst({
+        where: {
+          telegramUserId: userId,
+          paystackRef: { equals: cleanRef, mode: 'insensitive' }
+        }
+      })
+
+      if (existingPromo) {
+        await sendMessage(user.id, `❌ <b>Already Redeemed!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+You've already used this promo code!
+
+━━━━━━━━━━━━━━━━━━━
+
+💡 Each promo code can only be used once per user.
+
+Type /pay to see our plans!`)
+        processingReferences.delete(cleanRef)
+        return
+      }
+
+      // 1 week free access (Basic plan)
+      const days = 7
+      const expiresAt = new Date()
+      expiresAt.setDate(expiresAt.getDate() + days)
+
+      // Create subscription
+      await prisma.subscription.create({
+        data: {
+          telegramUserId: userId,
+          telegramUsername: user.username,
+          telegramName: user.first_name,
+          paystackRef: cleanRef,
+          amountKobo: 0,
+          planType: 'basic',
+          hasCopierAccess: false,
+          startedAt: new Date(),
+          expiresAt: expiresAt
+        }
+      })
+
+      // Create invite link and add to channel
+      const inviteLink = await createInviteLink()
+
+      await sendMessage(user.id, `🎉 <b>Promo Code Activated!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+✅ <b>VIP Promo - 1 Week Free Access!</b>
+
+📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}
+
+━━━━━━━━━━━━━━━━━━━
+
+🔗 <b>Join Channel:</b>
+${inviteLink}
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>Important:</b>
+• Click the link above to join the VIP channel
+• Access valid for 7 days from today
 • Enjoy free VIP signals!
 
 ━━━━━━━━━━━━━━━━━━━
@@ -2920,9 +3044,11 @@ Or send /cancel to exit.`
         break
 
       case '/promo':
-        // Usage: /promo EXTRA or /promo EXTRA2
+        // Usage: /promo CODE
         if (!args[0]) {
-          await sendMessage(from.id, `🎁 <b>Promo Codes</b>
+          // Only show promo codes to admins
+          if (from.id === ADMIN_ID) {
+            await sendMessage(from.id, `🎁 <b>Promo Codes (Admin View)</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -2930,17 +3056,35 @@ Or send /cancel to exit.`
 
 ✨ <b>EXTRA</b> - 1 Week Free Access
 ✨ <b>EXTRA2</b> - 2 Weeks Free Access
+✨ <b>VIP</b> - 1 Week Free Access
 
 ━━━━━━━━━━━━━━━━━━━
 
 <b>How to redeem:</b>
 /promo EXTRA
-or
 /promo EXTRA2
+/promo VIP
 
 ━━━━━━━━━━━━━━━━━━━
 
-<i>Redeem now to get free VIP access!</i>`)
+<i>All promo codes are one-time use per user</i>`)
+          } else {
+            await sendMessage(from.id, `🎁 <b>Have a Promo Code?</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+To redeem a promo code, use:
+/promo YOUR_CODE
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Example:</b>
+/promo EXTRA
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Contact admin if you have questions!</i>`)
+          }
         } else {
           await handleVerify(from, args[0], 'basic')
         }
