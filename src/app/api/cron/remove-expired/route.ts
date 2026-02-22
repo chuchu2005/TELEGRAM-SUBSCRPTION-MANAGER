@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { banChatMember, sendMessage } from '@/lib/telegram'
 import { removeUserMt5Account } from '@/lib/metacopier'
+import { ADMIN_ID } from '@/lib/config'
 
 /**
  * GET handler for cron job to remove expired users
@@ -36,12 +37,61 @@ export async function GET(request: NextRequest) {
 
             if (result.success) {
               console.log(`Successfully removed MetaCopier account for user ${subscription.telegramUserId}`)
+              // Notify admin of successful removal
+              await sendMessage(ADMIN_ID, `✅ <b>MetaCopier Account Removed</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>User:</b> ${subscription.telegramUserId} (${subscription.telegramUsername || 'N/A'})
+<b>MetaCopier Account:</b> ${subscription.mt5Setup.metacopierAccountId}
+<b>Reason:</b> Subscription expired
+
+━━━━━━━━━━━━━━━━━━━
+
+User has been removed from channel and MetaCopier.`)
             } else {
               console.error(`Failed to remove MetaCopier account for user ${subscription.telegramUserId}: ${result.error}`)
+              // Notify admin to manually remove
+              await sendMessage(ADMIN_ID, `⚠️ <b>MetaCopier Removal Failed - Manual Action Needed!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>User:</b> ${subscription.telegramUserId} (${subscription.telegramUsername || 'N/A'})
+<b>MetaCopier Account:</b> ${subscription.mt5Setup.metacopierAccountId}
+<b>MetaCopier Copier:</b> ${subscription.mt5Setup.metacopierCopierId || 'N/A'}
+<b>Error:</b> ${result.error}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Action Required:</b>
+• User has been removed from channel
+• But MetaCopier account could NOT be removed automatically
+• Please remove manually from MetaCopier dashboard
+
+<b>Login:</b> ${subscription.mt5Setup.loginAccountNumber}
+<b>Server:</b> ${subscription.mt5Setup.loginServer}`)
               // Continue with channel removal even if MetaCopier cleanup fails
             }
           } catch (mcError) {
             console.error(`Failed to delete MetaCopier account for user ${subscription.telegramUserId}:`, mcError)
+            // Notify admin of error
+            await sendMessage(ADMIN_ID, `⚠️ <b>MetaCopier Removal Error - Manual Action Needed!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>User:</b> ${subscription.telegramUserId} (${subscription.telegramUsername || 'N/A'})
+<b>MetaCopier Account:</b> ${subscription.mt5Setup.metacopierAccountId}
+<b>Error:</b> ${mcError instanceof Error ? mcError.message : 'Unknown error'}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Action Required:</b>
+• User has been removed from channel
+• But MetaCopier account removal encountered an error
+• Please check and remove manually if needed
+
+<b>Login:</b> ${subscription.mt5Setup.loginAccountNumber}
+<b>Server:</b> ${subscription.mt5Setup.loginServer}`)
             // Continue with channel removal even if MetaCopier cleanup fails
           }
         }

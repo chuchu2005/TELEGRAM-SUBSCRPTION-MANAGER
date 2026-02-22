@@ -169,6 +169,10 @@ Choose a plan to get instant access to our VIP community:
 
 <b>Need help?</b> Send /help
 
+<b>Any issues?</b> Contact @pearsignals
+
+━━━━━━━━━━━━━━━━━━━
+
 <i>Type /pay to get started</i>`
 
   await sendMessage(user.id, message)
@@ -1084,6 +1088,13 @@ ${inviteLink}
 Want to extend? Type /pay to see our plans!`)
 
       processingReferences.delete(cleanRef)
+      return
+    }
+
+    if (promoCode === 'DISCOUNT') {
+      // Redirect to promo plan verification (₦3,000, 7 days)
+      processingReferences.delete(cleanRef)
+      await handleVerifyPromo(user, 'DISCOUNT')
       return
     }
 
@@ -3056,9 +3067,10 @@ Or send /cancel to exit.`
 
 <b>Available Promo Codes:</b>
 
-✨ <b>EXTRA</b> - 1 Week Premium + Meta Copier
-✨ <b>EXTRA2</b> - 2 Weeks Premium + Meta Copier
-✨ <b>VIP</b> - 1 Week Basic Only
+✨ <b>EXTRA</b> - 1 Week Premium + Meta Copier (FREE)
+✨ <b>EXTRA2</b> - 2 Weeks Premium + Meta Copier (FREE)
+✨ <b>VIP</b> - 1 Week Basic Only (FREE)
+✨ <b>DISCOUNT</b> - 1 Week Basic (₦3,000)
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -3066,6 +3078,7 @@ Or send /cancel to exit.`
 /promo EXTRA
 /promo EXTRA2
 /promo VIP
+/promo DISCOUNT
 
 ━━━━━━━━━━━━━━━━━━━
 
