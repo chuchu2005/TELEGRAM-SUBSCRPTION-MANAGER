@@ -854,32 +854,7 @@ Please paste the reference again without extra characters!`)
       return
     }
 
-    // Check if reference is already used
-    const existingSubscription = await prisma.subscription.findUnique({
-      where: { paystackRef: cleanRef }
-    })
-
-    if (existingSubscription) {
-      await sendMessage(user.id, `❌ <b>Reference Already Used!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-This transaction reference has already been redeemed.
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>What to do:</b>
-• Wait for the next promo broadcast
-• Each broadcast has FRESH payment links
-• Old links stop working after one purchase
-
-━━━━━━━━━━━━━━━━━━━
-
-Type /pay to see our regular plans!`)
-      return
-    }
-
-    // Check for promo codes
+    // Check for promo codes (do this before checking if reference is used globally)
     const promoCode = cleanRef.toUpperCase()
 
     if (promoCode === 'EXTRA') {
@@ -907,7 +882,7 @@ Type /pay to see our plans!`)
         return
       }
 
-      // 1 week free access (Basic plan)
+      // 1 week free access (Premium plan)
       const days = 7
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + days)
@@ -920,8 +895,8 @@ Type /pay to see our plans!`)
           telegramName: user.first_name,
           paystackRef: cleanRef,
           amountKobo: 0,
-          planType: 'basic',
-          hasCopierAccess: false,
+          planType: 'premium',
+          hasCopierAccess: true,
           startedAt: new Date(),
           expiresAt: expiresAt
         }
@@ -934,7 +909,7 @@ Type /pay to see our plans!`)
 
 ━━━━━━━━━━━━━━━━━━━
 
-✅ <b>EXTRA Promo - 1 Week Free Access!</b>
+✅ <b>EXTRA Promo - 1 Week Premium Access!</b>
 
 📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}
 
@@ -949,6 +924,7 @@ ${inviteLink}
 • Click the link above to join the VIP channel
 • Access valid for 7 days from today
 • Enjoy free VIP signals!
+• Meta Copier access included!
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -983,7 +959,7 @@ Type /pay to see our plans!`)
         return
       }
 
-      // 2 weeks free access (Basic plan)
+      // 2 weeks free access (Premium plan)
       const days = 14
       const expiresAt = new Date()
       expiresAt.setDate(expiresAt.getDate() + days)
@@ -996,8 +972,8 @@ Type /pay to see our plans!`)
           telegramName: user.first_name,
           paystackRef: cleanRef,
           amountKobo: 0,
-          planType: 'basic',
-          hasCopierAccess: false,
+          planType: 'premium',
+          hasCopierAccess: true,
           startedAt: new Date(),
           expiresAt: expiresAt
         }
@@ -1010,7 +986,7 @@ Type /pay to see our plans!`)
 
 ━━━━━━━━━━━━━━━━━━━
 
-✅ <b>EXTRA2 Promo - 2 Weeks Free Access!</b>
+✅ <b>EXTRA2 Promo - 2 Weeks Premium Access!</b>
 
 📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}
 
@@ -1025,6 +1001,7 @@ ${inviteLink}
 • Click the link above to join the VIP channel
 • Access valid for 14 days from today
 • Enjoy free VIP signals!
+• Meta Copier access included!
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -1107,6 +1084,31 @@ ${inviteLink}
 Want to extend? Type /pay to see our plans!`)
 
       processingReferences.delete(cleanRef)
+      return
+    }
+
+    // Check if reference is already used (for Paystack transactions only)
+    const existingSubscription = await prisma.subscription.findUnique({
+      where: { paystackRef: cleanRef }
+    })
+
+    if (existingSubscription) {
+      await sendMessage(user.id, `❌ <b>Reference Already Used!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+This transaction reference has already been redeemed.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>What to do:</b>
+• Wait for the next promo broadcast
+• Each broadcast has FRESH payment links
+• Old links stop working after one purchase
+
+━━━━━━━━━━━━━━━━━━━
+
+Type /pay to see our regular plans!`)
       return
     }
 
@@ -3054,9 +3056,9 @@ Or send /cancel to exit.`
 
 <b>Available Promo Codes:</b>
 
-✨ <b>EXTRA</b> - 1 Week Free Access
-✨ <b>EXTRA2</b> - 2 Weeks Free Access
-✨ <b>VIP</b> - 1 Week Free Access
+✨ <b>EXTRA</b> - 1 Week Premium + Meta Copier
+✨ <b>EXTRA2</b> - 2 Weeks Premium + Meta Copier
+✨ <b>VIP</b> - 1 Week Basic Only
 
 ━━━━━━━━━━━━━━━━━━━
 
