@@ -12,7 +12,7 @@ model Subscription {
   telegramUserId   String    // Store as String - IDs can exceed 32-bit
   telegramUsername String?
   telegramName     String?
-  paystackRef      String    @unique  // Prevent double redemption
+  paystackRef      String    // Prevent double redemption (handled in app code)
   customerEmail    String?
   amountKobo       Int
   planType         String    // "basic" or "premium"
