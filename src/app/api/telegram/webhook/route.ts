@@ -1088,7 +1088,7 @@ Want to extend? Type /pay to see our plans!`)
     }
 
     // Check if reference is already used (for Paystack transactions only)
-    const existingSubscription = await prisma.subscription.findUnique({
+    const existingSubscription = await prisma.subscription.findFirst({
       where: { paystackRef: cleanRef }
     })
 

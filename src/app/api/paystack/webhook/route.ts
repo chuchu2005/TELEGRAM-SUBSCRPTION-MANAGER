@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
       const { data } = event
 
       // Check if reference is already processed
-      const existingSubscription = await prisma.subscription.findUnique({
+      const existingSubscription = await prisma.subscription.findFirst({
         where: { paystackRef: data.reference }
       })
 

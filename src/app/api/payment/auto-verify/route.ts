@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
     console.log('Auto-verifying payment:', reference)
 
     // Check if reference is already used
-    const existingSubscription = await prisma.subscription.findUnique({
+    const existingSubscription = await prisma.subscription.findFirst({
       where: { paystackRef: reference }
     })
 
