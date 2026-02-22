@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
         expiresAt: { lt: now },
         isRemoved: false
       },
-      include: { mt5Setup: true } // Include MT5 setup data
+      include: { mt5Setup: true } as any // Include MT5 setup data
     })
 
     let removedCount = 0
