@@ -1092,9 +1092,61 @@ Want to extend? Type /pay to see our plans!`)
     }
 
     if (promoCode === 'DISCOUNT') {
-      // Redirect to promo plan verification (₦3,000, 7 days)
+      // Generate DISCOUNT promo payment link (₦3,000, 7 days)
       processingReferences.delete(cleanRef)
-      await handleVerifyPromo(user, 'DISCOUNT')
+
+      const promoResponse = await fetch(`${APP_URL}/api/payment/link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          telegramId: userId,
+          telegramUsername: user.username || 'unknown',
+          planType: 'promo',
+          email: `${user.username || 'user'}@pearsignals.com`,
+          metadata: {
+            promoCode: 'DISCOUNT'
+          }
+        })
+      })
+
+      const promoData = await promoResponse.json()
+
+      if (!promoData.success) {
+        await sendMessage(user.id, '❌ Failed to generate payment link. Please try again.')
+        return
+      }
+
+      // Send payment link with button
+      await sendMessageWithKeyboard(user.id, `🎁 <b>DISCOUNT Promo - Special Offer!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+✨ <b>Get 1 Week Basic Access for ₦3,000!</b>
+
+<b>Normal price:</b> ₦5,000
+<b>Discount price:</b> ₦3,000
+<b>You save:</b> ₦2,000! (40% off)
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Plan details:</b>
+• 7 days access to VIP signals
+• Manual copy trading
+• Perfect for trying out at discount price!
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Click below to complete your payment!</i>`,
+        {
+          inline_keyboard: [
+              [
+                { text: '🔥 Pay ₦3,000 (7 Days)', url: promoData.authorizationUrl }
+              ],
+              [
+                { text: '✅ Verify Payment', callback_data: 'verify_promo' }
+              ]
+          ]
+        })
       return
     }
 
@@ -3070,7 +3122,7 @@ Or send /cancel to exit.`
 ✨ <b>EXTRA</b> - 1 Week Premium + Meta Copier (FREE)
 ✨ <b>EXTRA2</b> - 2 Weeks Premium + Meta Copier (FREE)
 ✨ <b>VIP</b> - 1 Week Basic Only (FREE)
-✨ <b>DISCOUNT</b> - 1 Week Basic (₦3,000)
+✨ <b>DISCOUNT</b> - 1 Week Basic (₦3,000) - Generates payment link
 
 ━━━━━━━━━━━━━━━━━━━
 
