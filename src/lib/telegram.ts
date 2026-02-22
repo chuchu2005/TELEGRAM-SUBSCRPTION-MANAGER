@@ -318,6 +318,11 @@ export async function setWebhook(webhookUrl: string): Promise<boolean> {
   try {
     const response = await fetch(`${TELEGRAM_API_BASE}/setWebhook?url=${encodeURIComponent(webhookUrl)}`)
     const data = await response.json()
+
+    if (!data.ok) {
+      console.error('Telegram API error:', data.description)
+    }
+
     return data.ok
   } catch (error) {
     console.error('Error setting webhook:', error)

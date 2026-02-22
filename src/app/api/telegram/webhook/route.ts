@@ -2690,6 +2690,12 @@ Or send /cancel to exit.`
     const command = parts[0].toLowerCase()
     const args = parts.slice(1)
 
+    // Debug logging
+    console.log('Received text:', text)
+    console.log('Parsed parts:', parts)
+    console.log('Command:', command)
+    console.log('Args:', args)
+
     const userId = from.id.toString()
 
     // Check if user is waiting for verification reference
