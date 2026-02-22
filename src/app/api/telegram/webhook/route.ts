@@ -1509,6 +1509,7 @@ async function handleSettings(user: TelegramUser): Promise<void> {
   const userId = user.id.toString()
 
   // Check if user has active Premium subscription with MT5 setup
+  
   const subscription = await prisma.subscription.findFirst({
     where: {
       telegramUserId: userId,
