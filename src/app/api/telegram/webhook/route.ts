@@ -702,32 +702,40 @@ ${message}
   }
 
   // Get all unique telegram user IDs
-  const subscriptions = await prisma.subscription.findMany({
-    where: whereClause,
-    select: {
-      telegramUserId: true,
-      telegramUsername: true
-    },
-    distinct: ['telegramUserId']
-  })
+  let recipients: { telegramUserId: string }[] = []
+
+  if (args.includes('--everyone') && planType === 'all' && !activeOnly) {
+    // Send to EVERYONE in the User table if specified
+    recipients = await prisma.user.findMany({
+      select: { telegramUserId: true }
+    })
+  } else {
+    // Default: Get unique telegram user IDs from subscriptions
+    const subs = await prisma.subscription.findMany({
+      where: whereClause,
+      select: {
+        telegramUserId: true,
+      },
+      distinct: ['telegramUserId']
+    })
+    recipients = subs
+  }
 
   // Send message to each user
   let successCount = 0
   let failedCount = 0
   const failedUsers: string[] = []
 
-  for (const subscription of subscriptions) {
+  for (const recipient of recipients) {
     try {
-      const sent = await sendMessage(subscription.telegramUserId, message)
+      const sent = await sendMessage(recipient.telegramUserId, message)
       if (sent) {
         successCount++
       } else {
         failedCount++
-        failedUsers.push(subscription.telegramUsername || subscription.telegramUserId.toString())
       }
     } catch (error) {
       failedCount++
-      failedUsers.push(subscription.telegramUsername || subscription.telegramUserId.toString())
     }
 
     // Add delay to avoid rate limiting (20 messages per second)
@@ -740,13 +748,197 @@ ${message}
 ━━━━━━━━━━━━━━━━━━━
 
 📊 <b>Stats:</b>
-• Total recipients: ${subscriptions.length}
+• Total recipients: ${recipients.length}
 • ✅ Successful: ${successCount}
 • ❌ Failed: ${failedCount}
 
 ${failedUsers.length > 0 ? `❌ <b>Failed Users:</b>\n${failedUsers.slice(0, 10).join('\n')}${failedUsers.length > 10 ? `\n... and ${failedUsers.length - 10} more` : ''}` : ''}`
 
   await sendMessage(user.id, summary)
+}
+
+/**
+ * Handle /botstats command - Admin only
+ * Shows comprehensive usage statistics
+ */
+async function handleBotStats(user: TelegramUser): Promise<void> {
+  // Check if user is admin
+  if (user.id !== ADMIN_ID) {
+    await sendMessage(user.id, '❌ Only the admin can use this command.')
+    return
+  }
+
+  try {
+    // 1. Total unique bot users (captured from /start and messages)
+    const totalUsers = await prisma.user.count()
+
+    // 2. Total unique subscribers (people who paid or used promo)
+    const uniqueSubscribers = await prisma.subscription.groupBy({
+      by: ['telegramUserId'],
+    })
+
+    // 3. Active subscribers
+    const now = new Date()
+    const activeSubscribers = await prisma.subscription.count({
+      where: {
+        expiresAt: { gt: now },
+        isRemoved: false
+      }
+    })
+
+    // 4. Premium users with MT5 Setup
+    const premiumWithSetup = await prisma.mt5Setup.count()
+
+    // 5. Total Revenue (NGN)
+    const totalRevenue = await prisma.subscription.aggregate({
+      _sum: {
+        amountKobo: true
+      }
+    })
+
+    const revenueNaira = (totalRevenue._sum.amountKobo || 0) / 100
+
+    // 6. Get latest active subscribers (limit to 10 for readability)
+    const latestSubs = await prisma.subscription.findMany({
+      where: {
+        expiresAt: { gt: now },
+        isRemoved: false
+      },
+      orderBy: { startedAt: 'desc' },
+      take: 10,
+      select: {
+        telegramName: true,
+        telegramUsername: true,
+        expiresAt: true,
+        planType: true
+      }
+    })
+
+    let subsList = ''
+    if (latestSubs.length > 0) {
+      subsList = '\n\n📅 <b>Latest Active Subscribers:</b>\n'
+      latestSubs.forEach(sub => {
+        const name = sub.telegramName || 'Unknown'
+        const username = sub.telegramUsername ? ` (@${sub.telegramUsername})` : ''
+        const expiry = sub.expiresAt.toLocaleDateString()
+        const plan = sub.planType.toUpperCase()
+        subsList += `• ${name}${username} - <b>${plan}</b> (Ends: ${expiry})\n`
+      })
+      if (activeSubscribers > 10) {
+        subsList += `<i>... and ${activeSubscribers - 10} more</i>\n`
+      }
+    }
+
+    const message = `📊 <b>Bot Usage Statistics (Admin)</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+👥 <b>Users:</b>
+• Total Bot Users: <b>${totalUsers}</b>
+• Unique Subscribers: <b>${uniqueSubscribers.length}</b>
+• Non-paying Users: <b>${totalUsers - uniqueSubscribers.length}</b>
+
+💎 <b>Subscriptions:</b>
+• Active VIP Members: <b>${activeSubscribers}</b>
+• Active MT5 Copiers: <b>${premiumWithSetup}</b>
+
+💰 <b>Financials:</b>
+• Total Revenue: <b>₦${revenueNaira.toLocaleString()}</b>${subsList}
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Note: "Total Bot Users" includes everyone who ever clicked /start or messaged the bot since tracking was enabled.</i>`
+
+    await sendMessage(user.id, message)
+  } catch (error) {
+    console.error('Error fetching bot stats:', error)
+    await sendMessage(user.id, '❌ Failed to fetch bot statistics.')
+  }
+}
+
+/**
+ * Handle /checkuser <id|username> command - Admin only
+ * Look up a specific user's status
+ */
+async function handleCheckUser(admin: TelegramUser, args: string[]): Promise<void> {
+  // Check if user is admin
+  if (admin.id !== ADMIN_ID) {
+    await sendMessage(admin.id, '❌ Only the admin can use this command.')
+    return
+  }
+
+  const query = args[0]?.trim()
+  if (!query) {
+    await sendMessage(admin.id, `❌ Please provide a User ID or Username.
+    
+<b>Usage:</b>
+/checkuser 123456789
+/checkuser @username`)
+    return
+  }
+
+  // Clean username if provided
+  const cleanQuery = query.startsWith('@') ? query.substring(1) : query
+
+  try {
+    // Search for user in User table or Subscription table
+    let user = await prisma.user.findFirst({
+      where: {
+        OR: [
+          { telegramUserId: cleanQuery },
+          { telegramUsername: { equals: cleanQuery, mode: 'insensitive' } }
+        ]
+      }
+    })
+
+    const userId = user?.telegramUserId || cleanQuery
+
+    // Find all subscriptions for this user
+    const subscriptions = await prisma.subscription.findMany({
+      where: { telegramUserId: userId },
+      orderBy: { startedAt: 'desc' },
+      include: { mt5Setup: true }
+    })
+
+    if (subscriptions.length === 0 && !user) {
+      await sendMessage(admin.id, `❌ No user found with ID/Username: <b>${query}</b>`)
+      return
+    }
+
+    const latestSub = subscriptions[0]
+    const now = new Date()
+    const isActive = latestSub && latestSub.expiresAt > now && !latestSub.isRemoved
+
+    let response = `👤 <b>User Lookup: ${query}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+🆔 <b>ID:</b> <code>${userId}</code>
+👤 <b>Name:</b> ${user?.telegramName || (latestSub?.telegramName) || 'Unknown'}
+📧 <b>Email:</b> ${latestSub?.customerEmail || 'None'}
+
+━━━━━━━━━━━━━━━━━━━
+
+📊 <b>Subscription:</b>
+• Status: ${isActive ? '✅ ACTIVE' : '❌ INACTIVE'}
+• Plan: ${latestSub ? latestSub.planType.toUpperCase() : 'None'}
+• Expires: ${latestSub ? latestSub.expiresAt.toLocaleDateString() : 'N/A'}
+
+🤖 <b>MT5 Copier:</b>
+• Setup: ${latestSub?.mt5Setup ? '✅ CONFIGURED' : '❌ NOT SET UP'}
+• Status: ${latestSub?.mt5Setup?.setupStatus.toUpperCase() || 'N/A'}
+
+━━━━━━━━━━━━━━━━━━━
+
+💳 <b>History:</b>
+• Total Subs: ${subscriptions.length}
+• Total Spent: ₦${(subscriptions.reduce((acc, s) => acc + s.amountKobo, 0) / 100).toLocaleString()}`
+
+    await sendMessage(admin.id, response)
+  } catch (error) {
+    console.error('Error in handleCheckUser:', error)
+    await sendMessage(admin.id, '❌ Failed to look up user.')
+  }
 }
 
 /**
@@ -3501,6 +3693,24 @@ export async function POST(request: NextRequest) {
 
       console.log('Received callback query:', data, 'from user:', userId)
 
+      // Auto-register/update user in the User table
+      try {
+        await prisma.user.upsert({
+          where: { telegramUserId: userId },
+          update: {
+            telegramUsername: from.username || null,
+            telegramName: from.first_name || null,
+          },
+          create: {
+            telegramUserId: userId,
+            telegramUsername: from.username || null,
+            telegramName: from.first_name || null,
+          }
+        })
+      } catch (err) {
+        console.error('[User Tracking] Failed to upsert user from callback:', err)
+      }
+
       // Handle MT5 setup and settings callbacks first
       if (data.startsWith('mt5_') || data.startsWith('settings_') || data.startsWith('lotsize_') || data.startsWith('maxlot_') || data.startsWith('maxpositions_')) {
         await handleMt5Callback(from, id, data, message?.message_id)
@@ -3578,13 +3788,25 @@ Or send /cancel to exit.`
     const command = parts[0].toLowerCase()
     const args = parts.slice(1)
 
-    // Debug logging
-    console.log('Received text:', text)
-    console.log('Parsed parts:', parts)
-    console.log('Command:', command)
-    console.log('Args:', args)
-
     const userId = from.id.toString()
+
+    // Auto-register/update user in the User table
+    try {
+      await prisma.user.upsert({
+        where: { telegramUserId: userId },
+        update: {
+          telegramUsername: from.username || null,
+          telegramName: from.first_name || null,
+        },
+        create: {
+          telegramUserId: userId,
+          telegramUsername: from.username || null,
+          telegramName: from.first_name || null,
+        }
+      })
+    } catch (err) {
+      console.error('[User Tracking] Failed to upsert user from message:', err)
+    }
 
     // Check if user is waiting for verification reference
     if (pendingVerificationUsers.has(userId) && !command.startsWith('/')) {
@@ -3905,6 +4127,14 @@ Or send /cancel to exit.`
 
       case '/broadcast':
         await handleBroadcast(from, args)
+        break
+
+      case '/botstats':
+        await handleBotStats(from)
+        break
+
+      case '/checkuser':
+        await handleCheckUser(from, args)
         break
 
       case '/broadcast_active':

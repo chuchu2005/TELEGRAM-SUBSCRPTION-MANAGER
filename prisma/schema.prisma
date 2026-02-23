@@ -124,3 +124,12 @@ model ConversationState {
   updatedAt        DateTime @updatedAt
   expiresAt        DateTime // Expiration time (set in application code)
 }
+
+model User {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  telegramUserId   String   @unique
+  telegramUsername String?
+  telegramName     String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+}
