@@ -8,13 +8,24 @@ import { prisma } from '@/lib/prisma'
 import { encryptPassword, decryptPassword } from './encryption'
 
 export type Mt5SetupStep = 'account_number' | 'password' | 'confirming'
+export type PromoStep = 'promo_code' | 'promo_name' | 'plan_type' | 'duration' | 'is_free' | 'has_copier' | 'amount' | 'expiry'
+export type ConversationStep = Mt5SetupStep | PromoStep
 
 export interface ConversationStateData {
-  step: Mt5SetupStep
+  step: ConversationStep
   data: {
+    // MT5 Setup Data
     accountNumber?: string
     password?: string
     server?: string
+    // Promo Creation Data
+    code?: string
+    name?: string | null
+    planType?: string
+    durationDays?: number
+    isFree?: boolean
+    amountKobo?: number
+    hasCopierAccess?: boolean
   }
 }
 
@@ -79,13 +90,31 @@ export async function getConversationState(userId: string): Promise<Conversation
 
   const ageInSeconds = Math.floor((Date.now() - state.updatedAt.getTime()) / 1000)
   console.log(`[Conversation State] Retrieved state for user ${userId}:`, { step: state.step, age: `${ageInSeconds}s` })
+  console.log(`[Conversation State] Promo data:`, {
+    promoCode: state.promoCode,
+    promoName: state.promoName,
+    promoPlanType: state.promoPlanType,
+    promoDurationDays: state.promoDurationDays,
+    promoIsFree: state.promoIsFree,
+    promoAmountKobo: state.promoAmountKobo,
+    promoHasCopier: state.promoHasCopier
+  })
 
   return {
-    step: state.step as Mt5SetupStep,
+    step: state.step as ConversationStep,
     data: {
+      // MT5 Setup Data
       accountNumber: state.accountNumber || undefined,
       password: decryptedPassword,
-      server: state.server || undefined
+      server: state.server || undefined,
+      // Promo Creation Data
+      code: state.promoCode || undefined,
+      name: state.promoName || undefined,
+      planType: state.promoPlanType || undefined,
+      durationDays: state.promoDurationDays || undefined,
+      isFree: state.promoIsFree ?? undefined,
+      amountKobo: state.promoAmountKobo ?? undefined,
+      hasCopierAccess: state.promoHasCopier ?? undefined
     }
   }
 }
@@ -117,18 +146,47 @@ export async function updateConversationData(userId: string, data: Partial<Conve
 
   const encryptedPassword = data.password ? encryptPassword(data.password) : undefined
 
+  const updateData: any = {
+    updatedAt: new Date(),
+    expiresAt: new Date(Date.now() + 5 * 60 * 1000) // Reset expiration
+  }
+
+  // MT5 Setup Data
+  if (data.accountNumber !== undefined) updateData.accountNumber = data.accountNumber
+  if (data.password !== undefined) updateData.password = encryptedPassword
+  if (data.server !== undefined) updateData.server = data.server
+
+  // Promo Creation Data
+  if (data.code !== undefined) updateData.promoCode = data.code
+  if (data.name !== undefined) updateData.promoName = data.name
+  if (data.planType !== undefined) updateData.promoPlanType = data.planType
+  if (data.durationDays !== undefined) updateData.promoDurationDays = data.durationDays
+  if (data.isFree !== undefined) updateData.promoIsFree = data.isFree
+  if (data.amountKobo !== undefined) updateData.promoAmountKobo = data.amountKobo
+  if (data.hasCopierAccess !== undefined) updateData.promoHasCopier = data.hasCopierAccess
+
+  await prisma.conversationState.update({
+    where: { telegramUserId: userId },
+    data: updateData
+  })
+
+  console.log(`[Conversation State] Updated data for user ${userId}:`, Object.keys(data))
+}
+
+/**
+ * Advance to next step in promo creation flow
+ */
+export async function advancePromoStep(userId: string, step: PromoStep): Promise<void> {
   await prisma.conversationState.update({
     where: { telegramUserId: userId },
     data: {
-      accountNumber: data.accountNumber !== undefined ? data.accountNumber : undefined,
-      password: encryptedPassword,
-      server: data.server !== undefined ? data.server : undefined,
+      step,
       updatedAt: new Date(),
       expiresAt: new Date(Date.now() + 5 * 60 * 1000) // Reset expiration
     }
   })
 
-  console.log(`[Conversation State] Updated data for user ${userId}:`, Object.keys(data))
+  console.log(`[Conversation State] Saved state for user ${userId}:`, { step })
 }
 
 /**
@@ -141,8 +199,13 @@ export async function advanceMt5SetupStep(userId: string): Promise<void> {
     return
   }
 
+  // Only advance if this is an MT5 setup step
+  if (!['account_number', 'password', 'confirming'].includes(currentState.step)) {
+    return
+  }
+
   const stepOrder: Mt5SetupStep[] = ['account_number', 'password', 'confirming']
-  const currentIndex = stepOrder.indexOf(currentState.step)
+  const currentIndex = stepOrder.indexOf(currentState.step as Mt5SetupStep)
 
   if (currentIndex < stepOrder.length - 1) {
     const nextStep = stepOrder[currentIndex + 1]

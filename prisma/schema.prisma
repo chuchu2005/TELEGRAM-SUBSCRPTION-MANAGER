@@ -7,6 +7,39 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model PromoCode {
+  id               String   @id @default(auto()) @map("_id") @db.ObjectId
+  code             String   @unique
+  name             String?  // Display name (e.g., "New Year Special")
+
+  // Plan settings
+  planType         String   // "basic", "premium", "biweekly", "monthly", "promo"
+  durationDays     Int
+  hasCopierAccess  Boolean  @default(false)
+
+  // Pricing
+  isFree           Boolean  @default(false)
+  amountKobo       Int?     // Payment amount in kobo (if not free)
+
+  // Expiry
+  expiresAt        DateTime // When this promo code expires
+
+  // Usage tracking
+  usageLimit       Int?     // Max number of users (null = unlimited)
+  usageCount       Int      @default(0) // How many users have used it
+  perUserLimit     Int      @default(1) // Max times per user (default 1)
+
+  // Metadata
+  createdBy        String   @default("admin") // Who created this promo
+  isActive         Boolean  @default(true) // Can be disabled
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([expiresAt])
+}
+
 model Subscription {
   id               String    @id @default(auto()) @map("_id") @db.ObjectId
   telegramUserId   String    // Store as String - IDs can exceed 32-bit
@@ -45,6 +78,7 @@ model Mt5Setup {
   // MetaCopier IDs
   metacopierAccountId   String?  // UUID from MetaCopier
   metacopierCopierId    String?  // UUID from MetaCopier
+  metacopierAccountIndex Int     @default(0) // Which MetaCopier account was used (0 = primary, 1 = secondary)
 
   // Copier Settings
   lotSize               Float    @default(0.01)  // User's desired lot size (multiplier calculated from this)
@@ -70,10 +104,20 @@ model ConversationState {
   telegramUserId   String   @unique
 
   // MT5 Setup Flow State
-  step             String   // "account_number", "password", "confirming"
+  step             String   // "account_number", "password", "confirming", "promo_code", "promo_name", "plan_type", "duration", "is_free", "has_copier", "amount", "expiry"
   accountNumber    String?
   password         String?  // Will be encrypted when stored
   server           String?
+
+  // Promo Code Creation Flow State
+  promoCode        String?  @map("promoCode")   // The promo code being created
+  promoName        String?  @map("promoName")   // Display name for promo
+  promoPlanType    String?  @map("promoPlanType") // "basic", "premium", "biweekly", "monthly"
+  promoDurationDays Int?    @map("promoDurationDays") // Duration in days
+  promoIsFree      Boolean? @map("promoIsFree") @default(false)
+  promoAmountKobo  Int?     @map("promoAmountKobo") // Payment amount in kobo (if not free)
+  promoHasCopier   Boolean? @map("promoHasCopier") @default(false)
+  promoExpiresAt   DateTime? @map("promoExpiresAt") // Promo expiry date
 
   // Session tracking
   createdAt        DateTime @default(now())

@@ -3,9 +3,9 @@ import { prisma } from '@/lib/prisma'
 import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText } from '@/lib/telegram'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
 import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID } from '@/lib/config'
-import { createMt5Account, updateCopierSettings } from '@/lib/metacopier'
+import { createMt5Account, updateCopierSettings, removeUserMt5Account } from '@/lib/metacopier'
 import { encryptPassword, decryptPassword } from '@/lib/encryption'
-import { setConversationState, getConversationState, clearConversationState, advanceMt5SetupStep, updateConversationData, Mt5SetupStep } from '@/lib/conversation-state'
+import { setConversationState, getConversationState, clearConversationState, advanceMt5SetupStep, advancePromoStep, updateConversationData, Mt5SetupStep } from '@/lib/conversation-state'
 import { settingsKeyboard, confirmSetupKeyboard, lotSizeKeyboard, maxLotKeyboard, maxLotTotalKeyboard, maxPositionsKeyboard } from '@/lib/telegram-keyboards'
 import type { TelegramUpdate, TelegramUser } from '@/lib/telegram'
 
@@ -858,8 +858,200 @@ Please paste the reference again without extra characters!`)
       return
     }
 
-    // Check for promo codes (do this before checking if reference is used globally)
+    // Check for custom promo codes from database (do this before checking if reference is used globally)
     const promoCode = cleanRef.toUpperCase()
+
+    // First, check for custom promo codes in database
+    const customPromo = await prisma.promoCode.findUnique({
+      where: { code: promoCode }
+    })
+
+    if (customPromo) {
+      // Check if promo is active
+      if (!customPromo.isActive) {
+        await sendMessage(user.id, `❌ <b>Promo Inactive</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+This promo code has been disabled.
+
+━━━━━━━━━━━━━━━━━━━
+
+Type /pay to see our regular plans!`)
+        processingReferences.delete(cleanRef)
+        return
+      }
+
+      // Check if promo has expired
+      if (new Date(customPromo.expiresAt) < new Date()) {
+        await sendMessage(user.id, `❌ <b>Promo Expired</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+This promo code expired on ${new Date(customPromo.expiresAt).toLocaleDateString()}.
+
+━━━━━━━━━━━━━━━━━━━
+
+Type /pay to see our regular plans!`)
+        processingReferences.delete(cleanRef)
+        return
+      }
+
+      // Check if promo usage limit reached
+      if (customPromo.usageLimit && customPromo.usageCount >= customPromo.usageLimit) {
+        await sendMessage(user.id, `❌ <b>Promo Usage Limit Reached</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+This promo code has been used ${customPromo.usageCount} times out of ${customPromo.usageLimit} limit.
+
+━━━━━━━━━━━━━━━━━━━
+
+Type /pay to see our regular plans!`)
+        processingReferences.delete(cleanRef)
+        return
+      }
+
+      // Check if user has already used this promo
+      const userPromoUsage = await prisma.subscription.findMany({
+        where: {
+          telegramUserId: userId,
+          paystackRef: { equals: cleanRef, mode: 'insensitive' }
+        }
+      })
+
+      if (userPromoUsage.length >= customPromo.perUserLimit) {
+        await sendMessage(user.id, `❌ <b>Already Redeemed!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+You've already used this promo code ${userPromoUsage.length} time${userPromoUsage.length > 1 ? 's' : ''}!
+
+━━━━━━━━━━━━━━━━━━━
+
+💡 Each promo code can be used ${customPromo.perUserLimit} time${customPromo.perUserLimit > 1 ? 's' : ''} per user.
+
+Type /pay to see our regular plans!`)
+        processingReferences.delete(cleanRef)
+        return
+      }
+
+      // Promo is valid - check if FREE or PAID
+      if (customPromo.isFree) {
+        // FREE promo - create subscription immediately
+        const expiresAt = new Date()
+        expiresAt.setDate(expiresAt.getDate() + customPromo.durationDays)
+
+        await prisma.subscription.create({
+          data: {
+            telegramUserId: userId,
+            telegramUsername: user.username,
+            telegramName: user.first_name,
+            paystackRef: cleanRef,
+            amountKobo: 0,
+            planType: customPromo.planType,
+            hasCopierAccess: customPromo.hasCopierAccess,
+            startedAt: new Date(),
+            expiresAt: expiresAt
+          }
+        })
+
+        // Update promo usage count
+        await prisma.promoCode.update({
+          where: { code: promoCode },
+          data: { usageCount: customPromo.usageCount + 1 }
+        })
+
+        // Create invite link
+        const inviteLink = await createInviteLink()
+
+        const plan = PLANS[customPromo.planType as PlanType]
+        await sendMessage(user.id, `🎉 <b>Promo Code Activated!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+✅ <b>${customPromo.name || customPromo.code} Promo - ${customPromo.durationDays} Days ${plan.name}!</b>
+
+📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}
+
+━━━━━━━━━━━━━━━━━━━
+
+🔗 <b>Join Channel:</b>
+${inviteLink}
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>Important:</b>
+• Click the link above to join the VIP channel
+• Access valid for ${customPromo.durationDays} days from today
+• Enjoy free VIP signals!
+${customPromo.hasCopierAccess ? '• Meta Copier access included!' : ''}
+
+━━━━━━━━━━━━━━━━━━━
+
+Want to extend? Type /pay to see our plans!`)
+
+        processingReferences.delete(cleanRef)
+        return
+      } else {
+        // PAID promo - generate payment link
+        const promoResponse = await fetch(`${APP_URL}/api/payment/link`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            telegramId: userId,
+            telegramUsername: user.username || 'unknown',
+            planType: 'custom', // Custom plan type
+            email: `${user.username || 'user'}@pearsignals.com`,
+            metadata: {
+              promoCode: promoCode,
+              customPromoId: customPromo.id
+            }
+          })
+        })
+
+        const promoData = await promoResponse.json()
+
+        if (!promoData.success) {
+          await sendMessage(user.id, '❌ Failed to generate payment link. Please try again.')
+          processingReferences.delete(cleanRef)
+          return
+        }
+
+        // Send payment link with button
+        const price = `₦${(customPromo.amountKobo! / 100).toLocaleString()}`
+        const planType = customPromo.planType as PlanType
+        await sendMessageWithKeyboard(user.id, `🎁 <b>${customPromo.name || customPromo.code} Promo - Special Offer!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+✨ <b>Get ${customPromo.durationDays} Days ${PLANS[planType].name} for ${price}!</b>
+
+<b>Normal price:</b> ${planType === 'basic' ? '₦5,000' : planType === 'premium' ? '₦22,000' : 'Regular price'}
+<b>Promo price:</b> ${price}
+<b>You save:</b> Get ${customPromo.durationDays} days for ${price}!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Plan details:</b>
+• ${customPromo.durationDays} days access to VIP signals
+• ${customPromo.hasCopierAccess ? 'Meta Copier access included!' : 'Manual copy trading'}
+• Perfect for trying out at discount price!
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Click below to complete your payment!</i>`,
+          {
+            inline_keyboard: [
+              [{ text: `🔥 Pay ${price} (${customPromo.durationDays} Days)`, url: promoData.authorizationUrl }]
+            ]
+          })
+        processingReferences.delete(cleanRef)
+        return
+      }
+    }
+
+    // Then check for hardcoded promo codes (EXTRA, EXTRA2, VIP, DISCOUNT)
 
     if (promoCode === 'EXTRA') {
       // Check if user already redeemed this promo code
@@ -1139,12 +1331,12 @@ Want to extend? Type /pay to see our plans!`)
 <i>Click below to complete your payment!</i>`,
         {
           inline_keyboard: [
-              [
-                { text: '🔥 Pay ₦3,000 (7 Days)', url: promoData.authorizationUrl }
-              ],
-              [
-                { text: '✅ Verify Payment', callback_data: 'verify_promo' }
-              ]
+            [
+              { text: '🔥 Pay ₦3,000 (7 Days)', url: promoData.authorizationUrl }
+            ],
+            [
+              { text: '✅ Verify Payment', callback_data: 'verify_promo' }
+            ]
           ]
         })
       return
@@ -1698,7 +1890,7 @@ async function handleSettings(user: TelegramUser): Promise<void> {
   const userId = user.id.toString()
 
   // Check if user has active Premium subscription with MT5 setup
-  
+
   const subscription = await prisma.subscription.findFirst({
     where: {
       telegramUserId: userId,
@@ -1837,6 +2029,28 @@ Contact support if this is an error.`)
   }
 
   try {
+    console.log(`[Remove Copier] Starting removal for user ${userId}, account index: ${mt5.metacopierAccountIndex ?? 0}`)
+
+    // Actually remove the account from MetaCopier API
+    const result = await removeUserMt5Account(
+      mt5.metacopierAccountId ?? '',
+      mt5.metacopierCopierId ?? '',
+      mt5.metacopierAccountIndex ?? 0
+    )
+
+    if (!result.success) {
+      await sendMessage(user.id, `❌ <b>Removal Failed</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Failed to remove MetaCopier account: ${result.error || 'Unknown error'}
+
+━━━━━━━━━━━━━━━━━━━
+
+Please try again later.`)
+      return
+    }
+
     console.log(`[Remove Copier] Auto-deleting database record and notifying admin for user ${userId}`)
 
     // Store details before deletion
@@ -1916,6 +2130,436 @@ You can set up a new copier anytime using /mt5setup`)
 There was an error removing your copier.
 
 Please try again or contact support directly.`)
+  }
+}
+
+/**
+ * Handle /create_promo command - Admin creates custom promo codes
+ */
+async function handleCreatePromo(user: TelegramUser): Promise<void> {
+  const userId = user.id.toString()
+
+  // Check if admin
+  if (user.id !== ADMIN_ID) {
+    await sendMessage(user.id, '❌ Only the admin can use this command.')
+    return
+  }
+
+  // Start conversation state for creating promo
+  await setConversationState(userId, {
+    step: 'promo_code',
+    data: {}
+  })
+
+  await sendMessage(user.id, `🎁 <b>Create Promo Code</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Let's create a custom promo code!
+
+<b>Step 1 of 7:</b>
+Send the promo code name (e.g., NEWYEAR, SUMMER2025)
+
+<i>Code must be UPPERCASE, no spaces</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+Type /cancel to exit`)
+}
+
+/**
+ * Handle /list_promos command - List all promo codes
+ */
+async function handleListPromos(user: TelegramUser): Promise<void> {
+  const userId = user.id.toString()
+
+  // Check if admin
+  if (user.id !== ADMIN_ID) {
+    await sendMessage(user.id, '❌ Only the admin can use this command.')
+    return
+  }
+
+  const promos = await prisma.promoCode.findMany({
+    orderBy: { createdAt: 'desc' }
+  })
+
+  if (promos.length === 0) {
+    await sendMessage(user.id, `📋 No promo codes found.
+
+Create one with /create_promo`)
+    return
+  }
+
+  let message = `📋 <b>All Promo Codes</b> (${promos.length})
+
+━━━━━━━━━━━━━━━━━━━`
+
+  for (const promo of promos) {
+    const status = promo.isActive ? '✅ Active' : '❌ Disabled'
+    const expiry = new Date(promo.expiresAt) < new Date() ? '❌ Expired' : `📅 ${new Date(promo.expiresAt).toLocaleDateString()}`
+    const price = promo.isFree ? 'FREE' : `₦${(promo.amountKobo! / 100).toLocaleString()}`
+
+    message += `\n<b>${promo.code}</b> - ${promo.name || 'No name'}
+├─ ${price} • ${promo.planType.toUpperCase()}
+├─ ${promo.durationDays} days • ${status}
+├─ ${expiry}
+├─ Used: ${promo.usageCount}${promo.usageLimit ? `/${promo.usageLimit}` : ' (unlimited)'}
+└─ Per user: ${promo.perUserLimit}x
+
+━━━━━━━━━━━━━━━━━━━`
+  }
+
+  message += `\n<i>Delete promo: /delete_promo CODE</i>`
+
+  await sendMessage(user.id, message)
+}
+
+/**
+ * Handle /delete_promo command - Delete a promo code
+ */
+async function handleDeletePromo(user: TelegramUser, args: string[]): Promise<void> {
+  const userId = user.id.toString()
+
+  // Check if admin
+  if (user.id !== ADMIN_ID) {
+    await sendMessage(user.id, '❌ Only the admin can use this command.')
+    return
+  }
+
+  if (!args[0]) {
+    await sendMessage(user.id, `❌ Please provide a promo code to delete.
+
+Usage: /delete_promo CODE
+
+Example: /delete_promo NEWYEAR`)
+    return
+  }
+
+  const promoCode = args[0].toUpperCase()
+
+  try {
+    await prisma.promoCode.delete({
+      where: { code: promoCode }
+    })
+
+    await sendMessage(user.id, `✅ <b>Promo Code Deleted</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Code:</b> ${promoCode}
+
+The promo code has been deleted.`)
+  } catch (error) {
+    await sendMessage(user.id, `❌ <b>Promo Code Not Found</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+The promo code "${promoCode}" doesn't exist.`)
+  }
+}
+
+/**
+ * Handle promo creation conversation flow
+ */
+async function handlePromoConversation(user: TelegramUser, text: string): Promise<void> {
+  const userId = user.id.toString()
+  const state = await getConversationState(userId)
+
+  if (!state) {
+    return // Not in promo creation flow
+  }
+
+  const trimmedText = text.trim()
+
+  switch (state.step) {
+    case 'promo_code': {
+      const code = trimmedText.toUpperCase()
+
+      // Validate code format (letters only, no spaces)
+      if (!/^[A-Z0-9]+$/.test(code)) {
+        await sendMessage(user.id, `❌ Invalid code format!
+
+Code must be UPPERCASE, letters and numbers only, no spaces.
+
+<i>Example: NEWYEAR, SUMMER2025, PROMO50</i>`)
+        return
+      }
+
+      // Check if code already exists
+      const existing = await prisma.promoCode.findUnique({
+        where: { code }
+      })
+
+      if (existing) {
+        await sendMessage(user.id, `❌ Code already exists!
+
+The code "${code}" is already in use.
+
+Please choose a different code.`)
+        return
+      }
+
+      await updateConversationData(userId, { code })
+      await advancePromoStep(userId, 'promo_name')
+      await sendMessage(user.id, `✅ Code saved!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Step 2 of 7:</b>
+What's this promo called? (Optional)
+
+<i>Leave empty to skip</i>`)
+      break
+    }
+
+    case 'promo_name': {
+      const name = trimmedText || null
+
+      await updateConversationData(userId, { name })
+      await advancePromoStep(userId, 'plan_type')
+      await sendMessage(user.id, `✅ Saved!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Step 3 of 7:</b>
+What plan type?
+
+<b>Choose:</b>
+1. Basic
+2. Premium
+3. Bi-Weekly
+4. Monthly
+
+<i>Send number (1-4)</i>`)
+      break
+    }
+
+    case 'plan_type': {
+      const planMap: Record<string, PlanType> = {
+        '1': 'basic',
+        '2': 'premium',
+        '3': 'biweekly',
+        '4': 'monthly'
+      }
+
+      const planType = planMap[trimmedText]
+
+      if (!planType) {
+        await sendMessage(user.id, `❌ Invalid choice!
+
+Please send 1, 2, 3, or 4`)
+        return
+      }
+
+      await updateConversationData(userId, { planType })
+      await advancePromoStep(userId, 'duration')
+      await sendMessage(user.id, `✅ Plan set to ${planType.toUpperCase()}!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Step 4 of 7:</b>
+How many days?
+
+<i>Send number of days (e.g., 7, 14, 30)</i>`)
+      break
+    }
+
+    case 'duration': {
+      const days = parseInt(trimmedText)
+
+      if (isNaN(days) || days < 1 || days > 365) {
+        await sendMessage(user.id, `❌ Invalid duration!
+
+Please enter 1-365 days.`)
+        return
+      }
+
+      await updateConversationData(userId, { durationDays: days })
+      await advancePromoStep(userId, 'is_free')
+      await sendMessage(user.id, `✅ ${days} days set!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Step 5 of 7:</b>
+Is this promo FREE or PAID?
+
+<b>Choose:</b>
+1. FREE
+2. PAID
+
+<i>Send number (1-2)</i>`)
+      break
+    }
+
+    case 'is_free': {
+      const isFree = trimmedText === '1'
+
+      await updateConversationData(userId, { isFree })
+      await advancePromoStep(userId, isFree ? 'has_copier' : 'amount')
+      await sendMessage(user.id, `✅ ${isFree ? 'FREE promo!' : 'PAID promo!'}
+
+━━━━━━━━━━━━━━━━━━━
+
+${isFree ? `
+<b>Step 6 of 7:</b>
+Does this include Meta Copier access?
+
+<b>Choose:</b>
+1. YES
+2. NO
+
+<i>Send number (1-2)</i>` : `
+<b>Step 6 of 7:</b>
+How much? (in Naira)
+
+<i>Send amount (e.g., 3000, 5000)</i>`}
+━━━━━━━━━━━━━━━━━━━`)
+      break
+    }
+
+    case 'has_copier': {
+      const hasCopierAccess = trimmedText === '1'
+
+      await updateConversationData(userId, { hasCopierAccess: hasCopierAccess })
+      await advancePromoStep(userId, 'expiry')
+      await sendMessage(user.id, `✅ Copier access ${hasCopierAccess ? 'INCLUDED' : 'NOT included'}!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Step 7 of 7:</b>
+When does this promo expire?
+
+<i>Send in format: DD/MM/YYYY</i>
+<i>Example: 31/12/2025</i>
+
+<i>Leave empty for no expiry</i>`)
+      break
+    }
+
+    case 'amount': {
+      const amount = parseInt(trimmedText)
+
+      if (isNaN(amount) || amount < 100) {
+        await sendMessage(user.id, `❌ Invalid amount!
+
+Amount must be at least ₦100.`)
+        return
+      }
+
+      const amountKobo = amount * 100 // Convert to kobo
+      await updateConversationData(userId, { amountKobo })
+      await advancePromoStep(userId, 'has_copier')
+      await sendMessage(user.id, `✅ ₦${amount.toLocaleString()} set!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Step 6 of 7:</b>
+Does this include Meta Copier access?
+
+<b>Choose:</b>
+1. YES
+2. NO
+
+<i>Send number (1-2)</i>`)
+      break
+    }
+
+    case 'expiry': {
+      let expiresAt: Date
+
+      if (trimmedText.length === 0) {
+        // No expiry - set to 1 year from now
+        expiresAt = new Date()
+        expiresAt.setFullYear(expiresAt.getFullYear() + 1)
+      } else {
+        // Parse date DD/MM/YYYY
+        const parts = trimmedText.split('/')
+        if (parts.length !== 3) {
+          await sendMessage(user.id, `❌ Invalid date format!
+
+Use DD/MM/YYYY format.
+
+Example: 31/12/2025`)
+          return
+        }
+
+        const day = parseInt(parts[0])
+        const month = parseInt(parts[1]) - 1 // Month is 0-indexed
+        const year = parseInt(parts[2])
+
+        if (isNaN(day) || isNaN(month) || isNaN(year)) {
+          await sendMessage(user.id, `❌ Invalid date!`)
+          return
+        }
+
+        expiresAt = new Date(year, month, day, 23, 59, 59) // End of that day
+      }
+
+      // Get all conversation data
+      const data = state.data as any
+
+      // Debug logging
+      console.log('[Promo Expiry] Retrieved data:', data)
+
+      // Create the promo code
+      try {
+        await prisma.promoCode.create({
+          data: {
+            code: data.code,
+            name: data.name,
+            planType: data.planType,
+            durationDays: data.durationDays,
+            hasCopierAccess: data.hasCopierAccess || false,
+            isFree: data.isFree,
+            amountKobo: data.isFree ? null : data.amountKobo,
+            expiresAt: expiresAt,
+            createdBy: 'admin',
+            isActive: true
+          }
+        })
+
+        // Clear conversation state
+        await clearConversationState(userId)
+
+        const plan = PLANS[data.planType as PlanType]
+        const price = data.isFree ? 'FREE' : `₦${(data.amountKobo / 100).toLocaleString()}`
+        const expiryText = trimmedText.length === 0 ? '1 year from now' : expiresAt.toLocaleDateString()
+
+        await sendMessage(user.id, `✅ <b>Promo Code Created!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Code:</b> ${data.code}
+<b>Name:</b> ${data.name || 'No name'}
+<b>Plan:</b> ${plan.name}
+<b>Duration:</b> ${data.durationDays} days
+<b>Price:</b> ${price}
+<b>Copier:</b> ${data.hasCopierAccess ? 'Included' : 'No'}
+<b>Expires:</b> ${expiryText}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Users can redeem with:</b>
+/promo ${data.code}
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Code is active and ready to use!</i>`)
+      } catch (error) {
+        console.error('Error creating promo code:', error)
+        await sendMessage(user.id, `❌ Failed to create promo code.
+
+Please try again.`)
+        await clearConversationState(userId)
+      }
+
+      break
+    }
+
+    default:
+      await sendMessage(user.id, `Something went wrong. Please start over with /create_promo`)
+      await clearConversationState(userId)
+      break
   }
 }
 
@@ -2089,8 +2733,8 @@ This happens when:
     await sendMessage(user.id, `⏳ Creating your MetaCopier account...
 This may take 10-20 seconds.`)
 
-    // Create MetaCopier account
-    const mcAccount = await createMt5Account({
+    // Create MetaCopier account (now with automatic fallback to secondary account)
+    const { account: mcAccount, accountIndex } = await createMt5Account({
       loginAccountNumber: state.data.accountNumber,
       loginAccountPassword: state.data.password,
       loginServer: state.data.server,
@@ -2101,7 +2745,7 @@ This may take 10-20 seconds.`)
     // Encrypt password
     const encryptedPassword = encryptPassword(state.data.password)
 
-    // Save to database
+    // Save to database with account index
     await prisma.mt5Setup.create({
       data: {
         subscriptionId: subscription.id,
@@ -2111,6 +2755,7 @@ This may take 10-20 seconds.`)
         regionId: 2, // London region ID in MetaCopier
         metacopierAccountId: mcAccount.accountId,
         metacopierCopierId: mcAccount.copierId,
+        metacopierAccountIndex: accountIndex, // Store which account was used (0 or 1)
         setupStatus: 'active'
       }
     })
@@ -2176,7 +2821,39 @@ Use /mystats to view your copier status!`)
     const errorMessage = error instanceof Error ? error.message : String(error)
     let userMessage = ''
 
-    if (errorMessage.includes('LOGIN_SERVER_NOT_FOUND')) {
+    if (errorMessage.includes('ACCOUNT_LIMIT_PER_PROJECT_REACHED_TRIAL')) {
+      userMessage = `❌ <b>Service Capacity Full!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+We have reached our temporary capacity limit for this project.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>What this means:</b>
+• The MetaCopier trial limit has been reached.
+• We are working to upgrade our capacity soon.
+• Please try again in 24 hours.
+
+━━━━━━━━━━━━━━━━━━━
+
+💡 <i>We apologize for the delay!</i>`
+    } else if (errorMessage.includes('Status 401') || errorMessage.includes('Empty response')) {
+      userMessage = `❌ <b>Service Authentication Error!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+There is a configuration issue with our connection to MetaCopier.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Error Detail:</b>
+• The secondary API key is invalid or deactivated.
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Admin has been notified to fix the API credentials. Please try again later!</i>`
+    } else if (errorMessage.includes('LOGIN_SERVER_NOT_FOUND')) {
       userMessage = `❌ <b>Server Not Found!</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -2206,7 +2883,7 @@ Use /mystats to view your copier status!`)
 ━━━━━━━━━━━━━━━━━━━
 
 Type /mt5setup to try again.`
-    } else if (errorMessage.includes('authentication') || errorMessage.includes('credentials') || errorMessage.includes('unauthorized') || errorMessage.includes('401') || errorMessage.includes('403')) {
+    } else if (errorMessage.includes('authentication') || errorMessage.includes('credentials') || errorMessage.includes('invalid') || errorMessage.includes('403')) {
       userMessage = `❌ <b>Invalid MT5 Credentials!</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -2251,6 +2928,26 @@ This MT5 account is already set up for copying.
 ━━━━━━━━━━━━━━━━━━━
 
 Use /settings to modify your copier settings.`
+    } else if (errorMessage.includes('ACCOUNT_LIMIT') || errorMessage.includes('TRIAL')) {
+      userMessage = `❌ <b>Account Limit Reached!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+The primary MetaCopier account has reached its 10 account limit.
+
+✅ <b>Automatically switching to secondary account...</b>
+
+Don't worry, the system has automatically switched to your secondary MetaCopier account.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>This is normal!</b> When you have many users, the bot automatically uses secondary accounts to handle the load.
+
+Your copier is now active on the secondary account.
+
+━━━━━━━━━━━━━━━━━━━
+
+Use /settings to modify your settings anytime!`
     } else {
       userMessage = `❌ <b>Setup Failed!</b>
 
@@ -2727,7 +3424,8 @@ Please complete MT5 setup first with /mt5setup`)
         maximumLot: pending.maximumLot ?? subscription.mt5Setup.maximumLot,
         maxOpenPositions: pending.maxOpenPositions ?? subscription.mt5Setup.maxOpenPositions,
         copyStopLoss: pending.copyStopLoss ?? subscription.mt5Setup.copyStopLoss,
-        copyTakeProfit: pending.copyTakeProfit ?? subscription.mt5Setup.copyTakeProfit
+        copyTakeProfit: pending.copyTakeProfit ?? subscription.mt5Setup.copyTakeProfit,
+        metacopierAccountIndex: subscription.mt5Setup.metacopierAccountIndex ?? 0 // Use the same account index that was used during setup
       }
 
       // Update MetaCopier
@@ -2928,10 +3626,22 @@ Please enter a valid email address.
       return NextResponse.json({ ok: true })
     }
 
-    // Check if user is in MT5 setup conversation flow
+    // Check if user is in conversation flow (MT5 setup or promo creation)
     const conversationState = await getConversationState(userId)
     if (conversationState && !command.startsWith('/')) {
-      await handleMt5Conversation(from, text!)
+      // Check if it's a promo conversation step
+      const promoSteps = ['promo_code', 'promo_name', 'plan_type', 'duration', 'is_free', 'has_copier', 'amount', 'expiry']
+      try {
+        if (promoSteps.includes(conversationState.step)) {
+          console.log('[Webhook] Calling handlePromoConversation for step:', conversationState.step)
+          await handlePromoConversation(from, text!)
+        } else {
+          await handleMt5Conversation(from, text!)
+        }
+      } catch (error) {
+        console.error('[Webhook] Error in conversation handler:', error)
+        await sendMessage(from.id, 'Something went wrong. Please try again.')
+      }
       return NextResponse.json({ ok: true })
     }
 
@@ -3207,6 +3917,18 @@ Or send /cancel to exit.`
 
       case '/broadcast_promo':
         await handleBroadcastPromo(from)
+        break
+
+      case '/create_promo':
+        await handleCreatePromo(from)
+        break
+
+      case '/list_promos':
+        await handleListPromos(from)
+        break
+
+      case '/delete_promo':
+        await handleDeletePromo(from, args)
         break
 
       case '/status':

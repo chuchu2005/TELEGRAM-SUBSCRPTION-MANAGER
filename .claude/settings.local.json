@@ -9,7 +9,11 @@
       "Bash(dir:*)",
       "Bash(npx prisma generate:*)",
       "Bash(npx tsc:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(powershell:*)",
+      "Bash(node:*)",
+      "Bash(Set-Content 'C:\\Users\\DALLAS COMPUTERS\\Desktop\\vipbot\\src\\lib\\conversation-state.ts' \")",
+      "Bash(python:*)"
     ]
   }
 }
