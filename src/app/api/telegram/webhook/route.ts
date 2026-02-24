@@ -977,6 +977,60 @@ async function handleVerifyPremium(user: TelegramUser, reference: string): Promi
 }
 
 /**
+ * Handle /promo command
+ */
+async function handlePromo(from: TelegramUser, args: string[]): Promise<void> {
+  // Usage: /promo CODE
+  if (!args[0]) {
+    // Only show promo codes to admins
+    if (from.id === ADMIN_ID) {
+      await sendMessage(from.id, `🎁 <b>Promo Codes (Admin View)</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Available Promo Codes:</b>
+
+✨ <b>EXTRA</b> - 1 Week Premium + Meta Copier (FREE)
+✨ <b>EXTRA2</b> - 2 Weeks Premium + Meta Copier (FREE)
+✨ <b>VIP</b> - 1 Week Basic Only (FREE)
+✨ <b>DISCOUNT</b> - 1 Week Basic (₦3,000) - Generates payment link
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>How to redeem:</b>
+/promo EXTRA
+/promo EXTRA2
+/promo VIP
+/promo DISCOUNT
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>All promo codes are one-time use per user</i>`)
+    } else {
+      await sendMessage(from.id, `🎁 <b>Have a Promo Code?</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+To redeem a promo code, use:
+/promo YOUR_CODE
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Example:</b>
+/promo EXTRA
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Contact admin if you have questions!</i>`)
+    }
+  } else {
+    // Treat the promo code as a reference for 'basic' plan verification
+    // This is how the existing logic was structured
+    await handleVerify(from, args[0], 'basic')
+  }
+}
+
+/**
  * Handle payment verification
  */
 async function handleVerify(user: TelegramUser, reference: string, planType: PlanType): Promise<void> {
@@ -985,11 +1039,7 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
 
   // Idempotency check: Don't process the same reference twice
   if (processingReferences.has(cleanRef)) {
-    await sendMessage(user.id, `⏳ <b>Already Processing!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-This reference is currently being verified. Please wait a moment...`)
+    await sendMessage(user.id, `⏳ <b>Already Processing!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\nThis reference is currently being verified. Please wait a moment...`)
     return
   }
 
@@ -1005,134 +1055,55 @@ This reference is currently being verified. Please wait a moment...`)
 
     // Validate reference format
     if (!reference || reference.trim().length === 0) {
-      await sendMessage(user.id, `❌ <b>No Reference Provided!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-Please paste your transaction reference.
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>What it looks like:</b>
-• iby0ro0awd
-• tx1k2m3n4v5
-• abc123xyz
-
-━━━━━━━━━━━━━━━━━━━
-
-Just paste the reference from your email below!`)
+      await sendMessage(user.id, `❌ <b>No Reference Provided!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\nPlease paste your transaction reference from your email below!`)
       return
     }
 
-    // Check if reference contains only valid characters
-    if (!/^[A-Za-z0-9_.-]+$/.test(cleanRef)) {
-      await sendMessage(user.id, `❌ <b>Invalid Reference Format!</b>
+    // Check for existing active subscription to calculate stacked expiry
+    const lastActiveSub = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        isRemoved: false,
+        expiresAt: { gt: new Date() }
+      },
+      orderBy: { expiresAt: 'desc' }
+    })
+    const currentExpiry = lastActiveSub?.expiresAt
 
-━━━━━━━━━━━━━━━━━━━
-
-The reference should only contain letters and numbers.
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>Examples:</b>
-• iby0ro0awd ✅
-• TXN_abc123 ✅
-• REF123456 ✅
-
-❌ REF: iby0ro0awd (don't include "REF:")
-❌ /verify_basic REF123 (don't include command)
-❌ iby0ro0 awd (no spaces)
-
-━━━━━━━━━━━━━━━━━━━
-
-Please paste the reference again without extra characters!`)
-      // Don't record failed attempt - let them try again
-      return
-    }
-
-    // Check for custom promo codes from database (do this before checking if reference is used globally)
+    // Check for promo codes
     const promoCode = cleanRef.toUpperCase()
 
-    // First, check for custom promo codes in database
+    // 1. Check for custom promo codes in database
     const customPromo = await prisma.promoCode.findUnique({
       where: { code: promoCode }
     })
 
     if (customPromo) {
-      // Check if promo is active
-      if (!customPromo.isActive) {
-        await sendMessage(user.id, `❌ <b>Promo Inactive</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-This promo code has been disabled.
-
-━━━━━━━━━━━━━━━━━━━
-
-Type /pay to see our regular plans!`)
-        processingReferences.delete(cleanRef)
+      if (!customPromo.isActive || new Date(customPromo.expiresAt) < new Date()) {
+        await sendMessage(user.id, `❌ <b>Promo Expired or Inactive</b>\n\nType /pay to see our regular plans!`)
         return
       }
 
-      // Check if promo has expired
-      if (new Date(customPromo.expiresAt) < new Date()) {
-        await sendMessage(user.id, `❌ <b>Promo Expired</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-This promo code expired on ${new Date(customPromo.expiresAt).toLocaleDateString()}.
-
-━━━━━━━━━━━━━━━━━━━
-
-Type /pay to see our regular plans!`)
-        processingReferences.delete(cleanRef)
-        return
-      }
-
-      // Check if promo usage limit reached
       if (customPromo.usageLimit && customPromo.usageCount >= customPromo.usageLimit) {
-        await sendMessage(user.id, `❌ <b>Promo Usage Limit Reached</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-This promo code has been used ${customPromo.usageCount} times out of ${customPromo.usageLimit} limit.
-
-━━━━━━━━━━━━━━━━━━━
-
-Type /pay to see our regular plans!`)
-        processingReferences.delete(cleanRef)
+        await sendMessage(user.id, `❌ <b>Promo Limit Reached</b>\n\nType /pay to see our regular plans!`)
         return
       }
 
       // Check if user has already used this promo
-      const userPromoUsage = await prisma.subscription.findMany({
+      const userPromoUsageCount = await prisma.subscription.count({
         where: {
           telegramUserId: userId,
           paystackRef: { equals: cleanRef, mode: 'insensitive' }
         }
       })
 
-      if (userPromoUsage.length >= customPromo.perUserLimit) {
-        await sendMessage(user.id, `❌ <b>Already Redeemed!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-You've already used this promo code ${userPromoUsage.length} time${userPromoUsage.length > 1 ? 's' : ''}!
-
-━━━━━━━━━━━━━━━━━━━
-
-💡 Each promo code can be used ${customPromo.perUserLimit} time${customPromo.perUserLimit > 1 ? 's' : ''} per user.
-
-Type /pay to see our regular plans!`)
-        processingReferences.delete(cleanRef)
+      if (userPromoUsageCount >= customPromo.perUserLimit) {
+        await sendMessage(user.id, `❌ <b>Already Redeemed!</b>\n\nYou've already used this promo code. Type /pay to see our plans!`)
         return
       }
 
-      // Promo is valid - check if FREE or PAID
       if (customPromo.isFree) {
-        // FREE promo - create subscription immediately
-        const expiresAt = new Date()
-        expiresAt.setDate(expiresAt.getDate() + customPromo.durationDays)
+        const expiresAt = calculateExpiryDate(customPromo.planType as PlanType, currentExpiry)
 
         await prisma.subscription.create({
           data: {
@@ -1141,344 +1112,85 @@ Type /pay to see our regular plans!`)
             telegramName: user.first_name,
             paystackRef: cleanRef,
             amountKobo: 0,
-            planType: customPromo.planType,
+            planType: customPromo.planType as PlanType,
             hasCopierAccess: customPromo.hasCopierAccess,
             startedAt: new Date(),
-            expiresAt: expiresAt
+            expiresAt: expiresAt,
+            inviteLinkUsed: lastActiveSub?.inviteLinkUsed || ''
           }
         })
 
-        // Update promo usage count
         await prisma.promoCode.update({
           where: { code: promoCode },
           data: { usageCount: customPromo.usageCount + 1 }
         })
 
-        // Create invite link
-        const inviteLink = await createInviteLink()
+        let inviteLink = lastActiveSub?.inviteLinkUsed || await createInviteLink() || ''
 
-        const plan = PLANS[customPromo.planType as PlanType]
-        await sendMessage(user.id, `🎉 <b>Promo Code Activated!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-✅ <b>${customPromo.name || customPromo.code} Promo - ${customPromo.durationDays} Days ${plan.name}!</b>
-
-📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}
-
-━━━━━━━━━━━━━━━━━━━
-
-🔗 <b>Join Channel:</b>
-${inviteLink}
-
-━━━━━━━━━━━━━━━━━━━
-
-⚠️ <b>Important:</b>
-• Click the link above to join the VIP channel
-• Access valid for ${customPromo.durationDays} days from today
-• Enjoy free VIP signals!
-${customPromo.hasCopierAccess ? '• Meta Copier access included!' : ''}
-
-━━━━━━━━━━━━━━━━━━━
-
-Want to extend? Type /pay to see our plans!`)
-
-        processingReferences.delete(cleanRef)
+        if (lastActiveSub) {
+          await sendMessage(user.id, `🎉 <b>Subscription Extended!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n✅ <b>${customPromo.name || customPromo.code} Promo Applied!</b>\n\n📅 <b>New Expiry:</b> ${expiresAt.toLocaleDateString()}\n\n━━━━━━━━━━━━━━━━━━━\n\nYour access has been extended. You are already in the VIP channel!`)
+        } else {
+          await sendMessage(user.id, `🎉 <b>Promo Activated!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n✅ <b>${customPromo.name || customPromo.code} Promo - ${customPromo.durationDays} Days!</b>\n\n📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}\n\n━━━━━━━━━━━━━━━━━━━\n\n🔗 <b>Join Channel:</b>\n${inviteLink}`)
+        }
         return
       } else {
-        // PAID promo - generate payment link
+        // PAID custom promo - generate link
         const promoResponse = await fetch(`${APP_URL}/api/payment/link`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             telegramId: userId,
             telegramUsername: user.username || 'unknown',
-            planType: 'custom', // Custom plan type
+            planType: 'custom',
             email: `${user.username || 'user'}@pearsignals.com`,
-            metadata: {
-              promoCode: promoCode,
-              customPromoId: customPromo.id
-            }
+            metadata: { promoCode: promoCode, customPromoId: customPromo.id }
           })
         })
-
         const promoData = await promoResponse.json()
-
-        if (!promoData.success) {
-          await sendMessage(user.id, '❌ Failed to generate payment link. Please try again.')
-          processingReferences.delete(cleanRef)
-          return
-        }
-
-        // Send payment link with button
-        const price = `₦${(customPromo.amountKobo! / 100).toLocaleString()}`
-        const planType = customPromo.planType as PlanType
-        await sendMessageWithKeyboard(user.id, `🎁 <b>${customPromo.name || customPromo.code} Promo - Special Offer!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-✨ <b>Get ${customPromo.durationDays} Days ${PLANS[planType].name} for ${price}!</b>
-
-<b>Normal price:</b> ${planType === 'basic' ? '₦5,000' : planType === 'premium' ? '₦22,000' : 'Regular price'}
-<b>Promo price:</b> ${price}
-<b>You save:</b> Get ${customPromo.durationDays} days for ${price}!
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>Plan details:</b>
-• ${customPromo.durationDays} days access to VIP signals
-• ${customPromo.hasCopierAccess ? 'Meta Copier access included!' : 'Manual copy trading'}
-• Perfect for trying out at discount price!
-
-━━━━━━━━━━━━━━━━━━━
-
-<i>Click below to complete your payment!</i>`,
-          {
-            inline_keyboard: [
-              [{ text: `🔥 Pay ${price} (${customPromo.durationDays} Days)`, url: promoData.authorizationUrl }]
-            ]
+        if (promoData.success) {
+          await sendMessageWithKeyboard(user.id, `🎁 <b>Special Offer!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n✨ <b>Get ${customPromo.durationDays} Days for ₦${(customPromo.amountKobo! / 100).toLocaleString()}!</b>`, {
+            inline_keyboard: [[{ text: `🔥 Pay Now`, url: promoData.authorizationUrl }]]
           })
-        processingReferences.delete(cleanRef)
+        }
         return
       }
     }
 
-    // Then check for hardcoded promo codes (EXTRA, EXTRA2, VIP, DISCOUNT)
-
-    if (promoCode === 'EXTRA') {
-      // Check if user already redeemed this promo code
-      const existingPromo = await prisma.subscription.findFirst({
-        where: {
-          telegramUserId: userId,
-          paystackRef: { equals: cleanRef, mode: 'insensitive' }
-        }
+    // 2. Check for hardcoded promo codes
+    if (['EXTRA', 'EXTRA2', 'VIP'].includes(promoCode)) {
+      const existingRedemption = await prisma.subscription.findFirst({
+        where: { telegramUserId: userId, paystackRef: { equals: promoCode, mode: 'insensitive' } }
       })
 
-      if (existingPromo) {
-        await sendMessage(user.id, `❌ <b>Already Redeemed!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-You've already used this promo code!
-
-━━━━━━━━━━━━━━━━━━━
-
-💡 Each promo code can only be used once per user.
-
-Type /pay to see our plans!`)
-        processingReferences.delete(cleanRef)
+      if (existingRedemption) {
+        await sendMessage(user.id, `❌ <b>Already Redeemed!</b>\n\nYou've already used this promo code!`)
         return
       }
 
-      // 1 week free access (Premium plan)
-      const days = 7
-      const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + days)
+      const plan: PlanType = promoCode === 'VIP' ? 'basic' : 'premium'
+      const expiresAt = calculateExpiryDate(plan, currentExpiry)
 
-      // Create subscription
       await prisma.subscription.create({
         data: {
           telegramUserId: userId,
           telegramUsername: user.username,
           telegramName: user.first_name,
-          paystackRef: cleanRef,
+          paystackRef: promoCode,
           amountKobo: 0,
-          planType: 'premium',
-          hasCopierAccess: true,
+          planType: plan,
+          hasCopierAccess: plan === 'premium',
           startedAt: new Date(),
-          expiresAt: expiresAt
+          expiresAt: expiresAt,
+          inviteLinkUsed: lastActiveSub?.inviteLinkUsed || ''
         }
       })
 
-      // Create invite link and add to channel
-      const inviteLink = await createInviteLink()
-
-      await sendMessage(user.id, `🎉 <b>Promo Code Activated!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-✅ <b>EXTRA Promo - 1 Week Premium Access!</b>
-
-📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}
-
-━━━━━━━━━━━━━━━━━━━
-
-🔗 <b>Join Channel:</b>
-${inviteLink}
-
-━━━━━━━━━━━━━━━━━━━
-
-⚠️ <b>Important:</b>
-• Click the link above to join the VIP channel
-• Access valid for 7 days from today
-• Enjoy free VIP signals!
-• Meta Copier access included!
-
-━━━━━━━━━━━━━━━━━━━
-
-Want to extend? Type /pay to see our plans!`)
-
-      processingReferences.delete(cleanRef)
-      return
-    }
-
-    if (promoCode === 'EXTRA2') {
-      // Check if user already redeemed this promo code
-      const existingPromo = await prisma.subscription.findFirst({
-        where: {
-          telegramUserId: userId,
-          paystackRef: { equals: cleanRef, mode: 'insensitive' }
-        }
-      })
-
-      if (existingPromo) {
-        await sendMessage(user.id, `❌ <b>Already Redeemed!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-You've already used this promo code!
-
-━━━━━━━━━━━━━━━━━━━
-
-💡 Each promo code can only be used once per user.
-
-Type /pay to see our plans!`)
-        processingReferences.delete(cleanRef)
-        return
-      }
-
-      // 2 weeks free access (Premium plan)
-      const days = 14
-      const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + days)
-
-      // Create subscription
-      await prisma.subscription.create({
-        data: {
-          telegramUserId: userId,
-          telegramUsername: user.username,
-          telegramName: user.first_name,
-          paystackRef: cleanRef,
-          amountKobo: 0,
-          planType: 'premium',
-          hasCopierAccess: true,
-          startedAt: new Date(),
-          expiresAt: expiresAt
-        }
-      })
-
-      // Create invite link and add to channel
-      const inviteLink = await createInviteLink()
-
-      await sendMessage(user.id, `🎉 <b>Promo Code Activated!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-✅ <b>EXTRA2 Promo - 2 Weeks Premium Access!</b>
-
-📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}
-
-━━━━━━━━━━━━━━━━━━━
-
-🔗 <b>Join Channel:</b>
-${inviteLink}
-
-━━━━━━━━━━━━━━━━━━━
-
-⚠️ <b>Important:</b>
-• Click the link above to join the VIP channel
-• Access valid for 14 days from today
-• Enjoy free VIP signals!
-• Meta Copier access included!
-
-━━━━━━━━━━━━━━━━━━━
-
-Want to extend? Type /pay to see our plans!`)
-
-      processingReferences.delete(cleanRef)
-      return
-    }
-
-    if (promoCode === 'VIP') {
-      // Check if user already redeemed this promo code
-      const existingPromo = await prisma.subscription.findFirst({
-        where: {
-          telegramUserId: userId,
-          paystackRef: { equals: cleanRef, mode: 'insensitive' }
-        }
-      })
-
-      if (existingPromo) {
-        await sendMessage(user.id, `❌ <b>Already Redeemed!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-You've already used this promo code!
-
-━━━━━━━━━━━━━━━━━━━
-
-💡 Each promo code can only be used once per user.
-
-Type /pay to see our plans!`)
-        processingReferences.delete(cleanRef)
-        return
-      }
-
-      // 1 week free access (Basic plan)
-      const days = 7
-      const expiresAt = new Date()
-      expiresAt.setDate(expiresAt.getDate() + days)
-
-      // Create subscription
-      await prisma.subscription.create({
-        data: {
-          telegramUserId: userId,
-          telegramUsername: user.username,
-          telegramName: user.first_name,
-          paystackRef: cleanRef,
-          amountKobo: 0,
-          planType: 'basic',
-          hasCopierAccess: false,
-          startedAt: new Date(),
-          expiresAt: expiresAt
-        }
-      })
-
-      // Create invite link and add to channel
-      const inviteLink = await createInviteLink()
-
-      await sendMessage(user.id, `🎉 <b>Promo Code Activated!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-✅ <b>VIP Promo - 1 Week Free Access!</b>
-
-📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}
-
-━━━━━━━━━━━━━━━━━━━
-
-🔗 <b>Join Channel:</b>
-${inviteLink}
-
-━━━━━━━━━━━━━━━━━━━
-
-⚠️ <b>Important:</b>
-• Click the link above to join the VIP channel
-• Access valid for 7 days from today
-• Enjoy free VIP signals!
-
-━━━━━━━━━━━━━━━━━━━
-
-Want to extend? Type /pay to see our plans!`)
-
-      processingReferences.delete(cleanRef)
+      let inviteLink = lastActiveSub?.inviteLinkUsed || await createInviteLink() || ''
+      await sendMessage(user.id, `🎉 <b>${promoCode} Activated!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}\n\n━━━━━━━━━━━━━━━━━━━\n\n${lastActiveSub ? 'Your access has been extended!' : `🔗 <b>Join Channel:</b>\n${inviteLink}`}`)
       return
     }
 
     if (promoCode === 'DISCOUNT') {
-      // Generate DISCOUNT promo payment link (₦3,000, 7 days)
-      processingReferences.delete(cleanRef)
-
       const promoResponse = await fetch(`${APP_URL}/api/payment/link`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -1487,268 +1199,46 @@ Want to extend? Type /pay to see our plans!`)
           telegramUsername: user.username || 'unknown',
           planType: 'promo',
           email: `${user.username || 'user'}@pearsignals.com`,
-          metadata: {
-            promoCode: 'DISCOUNT'
-          }
+          metadata: { promoCode: 'DISCOUNT' }
         })
       })
-
       const promoData = await promoResponse.json()
-
-      if (!promoData.success) {
-        await sendMessage(user.id, '❌ Failed to generate payment link. Please try again.')
-        return
-      }
-
-      // Send payment link with button
-      await sendMessageWithKeyboard(user.id, `🎁 <b>DISCOUNT Promo - Special Offer!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-✨ <b>Get 1 Week Basic Access for ₦3,000!</b>
-
-<b>Normal price:</b> ₦5,000
-<b>Discount price:</b> ₦3,000
-<b>You save:</b> ₦2,000! (40% off)
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>Plan details:</b>
-• 7 days access to VIP signals
-• Manual copy trading
-• Perfect for trying out at discount price!
-
-━━━━━━━━━━━━━━━━━━━
-
-<i>Click below to complete your payment!</i>`,
-        {
-          inline_keyboard: [
-            [
-              { text: '🔥 Pay ₦3,000 (7 Days)', url: promoData.authorizationUrl }
-            ],
-            [
-              { text: '✅ Verify Payment', callback_data: 'verify_promo' }
-            ]
-          ]
+      if (promoData.success) {
+        await sendMessageWithKeyboard(user.id, `🎁 <b>DISCOUNT Offer!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n✨ <b>Get 1 Week Basic for ₦3,000!</b>`, {
+          inline_keyboard: [[{ text: '🔥 Pay ₦3,000', url: promoData.authorizationUrl }]]
         })
+      }
       return
     }
 
-    // Check if reference is already used (for Paystack transactions only)
-    const existingSubscription = await prisma.subscription.findFirst({
-      where: { paystackRef: cleanRef }
-    })
-
-    if (existingSubscription) {
-      await sendMessage(user.id, `❌ <b>Reference Already Used!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-This transaction reference has already been redeemed.
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>What to do:</b>
-• Wait for the next promo broadcast
-• Each broadcast has FRESH payment links
-• Old links stop working after one purchase
-
-━━━━━━━━━━━━━━━━━━━
-
-Type /pay to see our regular plans!`)
+    // 3. Normal Paystack Verification
+    const existingVer = await prisma.subscription.findFirst({ where: { paystackRef: cleanRef } })
+    if (existingVer) {
+      await sendMessage(user.id, `❌ <b>Reference Already Used!</b>`)
       return
     }
 
-    // Verify transaction with Paystack
     const verification = await verifyTransaction(cleanRef)
-
-    if (!verification.success) {
-      const remaining = getRemainingAttempts(userId)
-      await sendMessage(user.id, `❌ <b>Invalid Reference!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-We couldn't find this transaction.
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>What to check:</b>
-• You copied the reference correctly (no spaces)
-• The payment was made successfully
-• You're using the correct reference
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>Remaining attempts:</b> ${remaining} of ${RATE_LIMIT.maxAttempts}
-
-<b>Try again:</b>
-Paste the reference number below (e.g., iby0ro0awd)
-
-Or send /pay to make a new payment`)
-      // Don't record failed attempt for invalid reference - let them try again
+    if (!verification.success || verification.status !== 'success') {
+      await sendMessage(user.id, `❌ <b>Verification Failed!</b>\n\nPlease check your reference or complete payment.`)
       return
     }
 
-    // Validate payment status
-    if (verification.status !== 'success') {
-      const remaining = recordFailedAttempt(userId)
-      if (remaining === 0) {
-        await sendMessage(user.id, `❌ <b>Payment Not Completed!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-This payment hasn't been completed successfully.
-
-━━━━━━━━━━━━━━━━━━━
-
-Too many failed attempts. Please try again in 1 hour.`)
-      } else {
-        await sendMessage(user.id, `❌ <b>Payment Not Completed!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-This payment hasn't been completed successfully.
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>Remaining attempts:</b> ${remaining} of ${RATE_LIMIT.maxAttempts}
-
-Please complete the payment first, then verify again.
-
-Or send /pay to make a new payment`)
-      }
-      return
-    }
-
-    // Validate payment channel
-    if (!validatePaymentChannel(verification.channel || '')) {
-      const remaining = recordFailedAttempt(userId)
-      if (remaining === 0) {
-        await sendMessage(user.id, `❌ Invalid payment channel. Please pay using bank transfer or card.
-
-Too many failed attempts. Please try again in 1 hour.`)
-      } else {
-        await sendMessage(user.id, `❌ Invalid payment channel. Please pay using bank transfer or card.
-
-Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
-      }
-      return
-    }
-
-    // Check if promo payment link has expired (2 days)
-    if (planType === 'promo') {
-      // Extract broadcast timestamp from transaction metadata
-      const metadataTimestamp = verification.metadata?.broadcastTimestamp
-      let broadcastTimestamp: number | undefined
-
-      if (metadataTimestamp) {
-        broadcastTimestamp = parseInt(metadataTimestamp, 10)
-      }
-
-      if (broadcastTimestamp) {
-        const now = Date.now()
-        const hoursSinceBroadcast = (now - broadcastTimestamp) / (1000 * 60 * 60)
-
-        if (hoursSinceBroadcast > PROMO_EXPIRY_HOURS) {
-          const remaining = getRemainingAttempts(userId)
-          await sendMessage(user.id, `❌ <b>Promo Link Expired!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-This promo link was sent more than 2 days ago.
-
-Promo links expire after ${PROMO_EXPIRY_HOURS} hours to ensure fair pricing.
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>What to do:</b>
-• Wait for the next promo broadcast
-• New broadcasts create fresh links
-• Or use /pay to see regular plans
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>Remaining attempts:</b> ${remaining} of ${RATE_LIMIT.maxAttempts}`)
-          return
-        }
-      }
-    }
-
-    // Get expected amount for the plan
+    // Validate plan amount
     const expectedAmount = PLANS[planType].amountKobo
-
-    // Check if payment amount matches the plan (with cross-check for wrong command usage)
-    const amountValidation = validatePaymentAmount(verification.amount!, expectedAmount)
-
-    if (!amountValidation.valid) {
-      const remaining = recordFailedAttempt(userId)
-      // Check if user used wrong command
-      // Try to find which plan the user actually paid for
-      let actualPaidPlan: PlanType | null = null
-      for (const plan of ['basic', 'biweekly', 'monthly', 'promo', 'premium'] as PlanType[]) {
-        if (verification.amount === PLANS[plan].amountKobo) {
-          actualPaidPlan = plan
-          break
-        }
-      }
-
-      if (actualPaidPlan && actualPaidPlan !== planType) {
-        await sendMessage(user.id, `❌ You used /verify_${planType} but paid for the ${actualPaidPlan.charAt(0).toUpperCase() + actualPaidPlan.slice(1)} plan (NGN ${(PLANS[actualPaidPlan].amountKobo / 100).toLocaleString()}).
-
-Please use /verify_${actualPaidPlan} ${cleanRef} instead.
-
-Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
-      } else {
-        await sendMessage(user.id, `❌ ${amountValidation.message}
-
-Use /verify_basic for Basic (NGN 5,000), /verify_biweekly for Bi-Weekly (NGN 10,000), /verify_monthly for Monthly (NGN 15,000), /verify_promo for Promo (NGN 3,000), or /verify_premium for Premium (NGN 22,000)
-
-Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
-      }
+    const vPlanName = PLANS[planType].name
+    if (!validatePaymentAmount(verification.amount!, expectedAmount).valid) {
+      await sendMessage(user.id, `❌ <b>Amount Mismatch!</b>\n\nThis payment does not match the ${vPlanName} plan.`)
       return
     }
 
-    // Check if user was previously removed from the channel and unban them
-    const previousRemovedSubscriptions = await prisma.subscription.findMany({
-      where: {
-        telegramUserId: userId,
-        isRemoved: true
-      }
-    })
+    // Stacking logic for paid plans
+    const expiresAt = calculateExpiryDate(planType, currentExpiry)
 
-    if (previousRemovedSubscriptions.length > 0) {
-      // User was previously removed, unban them so they can rejoin
-      const unbanned = await unbanChatMember(user.id)
-      if (unbanned) {
-        console.log(`Unbanned user ${userId} who is repaying`)
-      }
-    }
-
-    // Create invite link
-    const inviteLink = await createInviteLink()
-
-    if (!inviteLink) {
-      const remaining = recordFailedAttempt(userId)
-      if (remaining === 0) {
-        await sendMessage(user.id, `❌ Failed to generate invite link. Please try again or contact support.
-
-Too many failed attempts. Please try again in 1 hour.`)
-      } else {
-        await sendMessage(user.id, `❌ Failed to generate invite link. Please try again or contact support.
-
-Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
-      }
-      return
-    }
-
-    // Calculate expiry date
-    const expiresAt = calculateExpiryDate(planType)
-
-    // Save subscription to database
     try {
       await prisma.subscription.create({
         data: {
-          telegramUserId: user.id.toString(),
+          telegramUserId: userId,
           telegramUsername: user.username,
           telegramName: `${user.first_name}${user.last_name ? ' ' + user.last_name : ''}`,
           paystackRef: cleanRef,
@@ -1757,119 +1247,40 @@ Remaining attempts: ${remaining} of ${RATE_LIMIT.maxAttempts}`)
           planType,
           hasCopierAccess: PLANS[planType].hasCopierAccess,
           startedAt: new Date(),
-          expiresAt,
-          inviteLinkUsed: inviteLink
+          expiresAt: expiresAt,
+          inviteLinkUsed: lastActiveSub?.inviteLinkUsed || ''
         }
       })
-    } catch (error) {
-      console.error('Error saving subscription:', error)
-      await sendMessage(user.id, '❌ An error occurred while saving your subscription. Please contact support.')
+    } catch (e) {
+      console.error('Save error:', e)
+      await sendMessage(user.id, '❌ <b>Database Error</b>\n\nFailed to save your subscription. Please contact support.')
       return
     }
 
-    // Reset rate limit on success
     resetRateLimit(userId)
+    const formattedExpiry = expiresAt.toLocaleDateString()
 
-    // Send success message
-    const planName = PLANS[planType].name
-    const formattedAmount = formatAmount(verification.amount!)
-    const formattedExpiry = formatDate(expiresAt)
-
-    let successMessage = `✅ Payment Verified Successfully!
-
-💎 Plan: ${planName}
-💰 Amount: ${formattedAmount}
-📅 Access expires: ${formattedExpiry}
-
-Here is your one-time invite link (valid for 24 hours):
-👉 ${inviteLink}
-
-Click the link to join the channel. The link can only be used once.
-
-Type /status anytime to check your subscription.`
-
-    if (PLANS[planType].hasCopierAccess) {
-      successMessage += `
-
-━━━━━━━━━━━━━━━━━━━
-
-🤖 <b>MT5 AUTO COPIER ACTIVATED!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-⚠️ <b>CRITICAL REQUIREMENTS:</b>
-
-<b>1. YOUR ACCOUNT MUST BE A CENT ACCOUNT!</b>
-❌ Standard Account - <b>WILL NOT WORK</b>
-✅ Cent Account - <b>REQUIRED</b>
-
-<b>2. SCALING: DISABLED (No Scaling)</b>
-💡 Copy trades exactly as master opens them
-
-<b>3. MAGIC NUMBER: 123456</b>
-🔢 Set this in your MT5 EA settings
-
-<b>4. REGION: LONDON</b>
-🌍 Your copier will use London region
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>Copy Settings Explained Simply:</b>
-
-📊 <b>Multiplier (1.0x):</b>
-<i>"Default setting - Copy same size as master"</i>
-
-<b>Examples in baby language:</b>
-• 1.0x = Master opens 0.01 → You open 0.01 ✅
-• 2.0x = Master opens 0.01 → You open 0.02 📈
-• 3.0x = Master opens 0.01 → You open 0.03 🚀
-
-<i>"Higher multiplier = Bigger trades = More profit BUT more risk!"</i>
-
-📏 <b>Max Lot (0.2):</b>
-<i>"Biggest trade we'll copy is 0.2 lots"</i>
-
-🔢 <b>Max Positions (10):</b>
-<i>"Maximum 10 trades at the same time"</i>
-
-━━━━━━━━━━━━━━━━━━━
-
-🎁 <b>DON'T HAVE A HEADWAY ACCOUNT?</b>
-
-Create one here and get <b>$100 BONUS!</b>
-👉 https://headway.partners/user/signup?hwp=82067c
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>To set up your copier, type:</b>
-/mt5setup
-
-Or skip for now - you have access for your full 14 days!`
-    }
-
-    await sendMessage(user.id, successMessage)
-
-    // If Premium plan, trigger MT5 setup flow
-    console.log(`[MT5 Setup Check] PlanType: ${planType}, hasCopierAccess: ${PLANS[planType].hasCopierAccess}`)
-
-    if (PLANS[planType].hasCopierAccess) {
-      console.log(`[MT5 Setup] Starting MT5 setup flow for user ${userId}`)
-
-      // Auto-start the setup flow
-      await setConversationState(userId, {
-        step: 'account_number',
-        data: {}
-      })
-
-      console.log(`[MT5 Setup] Conversation state set for user ${userId}`)
+    if (lastActiveSub) {
+      await sendMessage(user.id, `✅ <b>Subscription Extended!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n💎 <b>Plan:</b> ${vPlanName}\n📅 <b>New Expiry:</b> ${formattedExpiry}\n\n━━━━━━━━━━━━━━━━━━━\n\nYou are already in the VIP channel!`)
     } else {
-      console.log(`[MT5 Setup] Plan ${planType} does not have copier access. Skipping MT5 setup.`)
+      const inviteLink = await createInviteLink()
+      await sendMessage(user.id, `✅ <b>Payment Verified!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n💎 <b>Plan:</b> ${vPlanName}\n📅 <b>Expires:</b> ${formattedExpiry}\n\n━━━━━━━━━━━━━━━━━━━\n\n🔗 <b>Join Channel:</b>\n${inviteLink}`)
     }
+
+    // AUTO-FLOW for Premium (Copier Access)
+    if (PLANS[planType].hasCopierAccess) {
+      await setConversationState(userId, { step: 'account_number', data: {} })
+      await sendMessage(user.id, `🤖 <b>Copier Access Detected!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\nLet's set up your MT5 Copier.\n\nPlease send your <b>MT5 Account Number</b> to begin!`)
+    }
+  } catch (error) {
+    console.error('Verify error:', error)
+    await sendMessage(user.id, '❌ <b>System Error</b>\n\nAn unexpected error occurred. Please try again later.')
   } finally {
     // Always remove from processing set (idempotency cleanup)
     processingReferences.delete(cleanRef)
   }
 }
+
 
 /**
  * Handle /status command
@@ -3790,6 +3201,76 @@ Or send /cancel to exit.`
 
     const userId = from.id.toString()
 
+    // Handle Deep Linking (start parameter)
+    // Telegram sends t.me/bot?start=payload as "/start payload"
+    if (command === '/start' && args.length > 0) {
+      const payload = args[0]
+      console.log(`[DeepLink] Received payload: ${payload}`)
+
+      // Handle clean command mapping (e.g., promo_VIP -> /promo VIP)
+      if (payload.includes('_')) {
+        const [targetCmd, ...cmdArgs] = payload.split('_')
+        const newCommand = `/${targetCmd}`
+
+        // Only re-map if it's a known command to avoid hijacking /start
+        const knownCommands = ['/promo', '/pay', '/verify', '/checkuser', '/status', '/help']
+        if (knownCommands.includes(newCommand)) {
+          console.log(`[DeepLink] Re-routing /start ${payload} to ${newCommand} ${cmdArgs.join(' ')}`)
+          // We don't want to lose the user registration, but we skip handleStart
+          // We'll update the command and args variables for the switch block below
+          // Update local variables (re-declared as let in the target content or adjusted)
+          // Actually, we can just replace the logic here:
+          await (async () => {
+            // Re-run registration just in case
+            try {
+              await prisma.user.upsert({
+                where: { telegramUserId: userId },
+                update: {
+                  telegramUsername: from.username || null,
+                  telegramName: from.first_name || null,
+                },
+                create: {
+                  telegramUserId: userId,
+                  telegramUsername: from.username || null,
+                  telegramName: from.first_name || null,
+                }
+              })
+            } catch (err) {
+              console.error('[User Tracking] Failed to upsert user from deep link:', err)
+            }
+
+            // Route to target command
+            switch (newCommand) {
+              case '/promo':
+                await handlePromo(from, cmdArgs)
+                break
+              case '/pay':
+                await handlePay(from)
+                break
+              case '/status':
+                await handleStatus(from)
+                break
+              case '/help':
+                await handleHelp(from)
+                break
+              default:
+                // If not specifically handled here, let it fall through to normal switch
+                // with the new command/args if we were to modify them.
+                // For safety, we just call handleStart if no specific mapping
+                await handleStart(from)
+            }
+          })()
+          return NextResponse.json({ ok: true })
+        }
+      } else if (payload === 'help') {
+        await handleHelp(from)
+        return NextResponse.json({ ok: true })
+      } else if (payload === 'status') {
+        await handleStatus(from)
+        return NextResponse.json({ ok: true })
+      }
+    }
+
     // Auto-register/update user in the User table
     try {
       await prisma.user.upsert({
@@ -4041,52 +3522,7 @@ Or send /cancel to exit.`
         break
 
       case '/promo':
-        // Usage: /promo CODE
-        if (!args[0]) {
-          // Only show promo codes to admins
-          if (from.id === ADMIN_ID) {
-            await sendMessage(from.id, `🎁 <b>Promo Codes (Admin View)</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>Available Promo Codes:</b>
-
-✨ <b>EXTRA</b> - 1 Week Premium + Meta Copier (FREE)
-✨ <b>EXTRA2</b> - 2 Weeks Premium + Meta Copier (FREE)
-✨ <b>VIP</b> - 1 Week Basic Only (FREE)
-✨ <b>DISCOUNT</b> - 1 Week Basic (₦3,000) - Generates payment link
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>How to redeem:</b>
-/promo EXTRA
-/promo EXTRA2
-/promo VIP
-/promo DISCOUNT
-
-━━━━━━━━━━━━━━━━━━━
-
-<i>All promo codes are one-time use per user</i>`)
-          } else {
-            await sendMessage(from.id, `🎁 <b>Have a Promo Code?</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-To redeem a promo code, use:
-/promo YOUR_CODE
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>Example:</b>
-/promo EXTRA
-
-━━━━━━━━━━━━━━━━━━━
-
-<i>Contact admin if you have questions!</i>`)
-          }
-        } else {
-          await handleVerify(from, args[0], 'basic')
-        }
+        await handlePromo(from, args)
         break
 
       case '/verify_premium':

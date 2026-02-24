@@ -57,9 +57,12 @@ export function getPlan(planType: PlanType) {
 }
 
 // Helper function to calculate expiry date
-export function calculateExpiryDate(planType: PlanType): Date {
+export function calculateExpiryDate(planType: PlanType, baseDate?: Date): Date {
   const plan = getPlan(planType)
-  const expiryDate = new Date()
+  const now = new Date()
+  const startFrom = (baseDate && baseDate > now) ? baseDate : now
+
+  const expiryDate = new Date(startFrom)
   expiryDate.setDate(expiryDate.getDate() + plan.durationDays)
   return expiryDate
 }
