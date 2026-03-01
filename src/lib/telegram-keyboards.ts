@@ -20,6 +20,7 @@ export interface CopierSettings {
   maxOpenPositions: number
   copyStopLoss: boolean
   copyTakeProfit: boolean
+  tp2Enabled: boolean
 }
 
 /**
@@ -43,6 +44,9 @@ export function settingsKeyboard(currentSettings: CopierSettings): InlineKeyboar
       [
         { text: `🛑 SL: ${currentSettings.copyStopLoss ? '✅' : '❌'}`, callback_data: 'settings_sl' },
         { text: `🎯 TP: ${currentSettings.copyTakeProfit ? '✅' : '❌'}`, callback_data: 'settings_tp' }
+      ],
+      [
+        { text: `🚀 Take TP2 Trades: ${currentSettings.tp2Enabled ? '✅' : '❌'}`, callback_data: 'settings_tp2' }
       ],
       [
         { text: '💾 Save Settings', callback_data: 'settings_save' }

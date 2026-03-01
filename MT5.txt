@@ -1,0 +1,1045 @@
+//+------------------------------------------------------------------+
+//|                               TelegramSignalEA_Standalone.mq5     |
+//|                                      No External Libraries Needed |
+//|                                                                  |
+//+------------------------------------------------------------------+
+#property copyright "Modified for Auto Trading - Standalone Version"
+#property description "Telegram Signal EA - Separate TP Level Orders"
+#property version   "5.00"
+#property strict
+
+#include <Trade\Trade.mqh>
+
+input string   TelegramBotToken = "";
+input string   ChatID = "0";
+input int      UpdateInterval = 2;
+input double   FixedLotSize = 0.01;      // Lot size per order
+input int      TP1Orders = 8;            // Number of orders for TP1
+input int      TP2Orders = 2;            // Number of orders for TP2
+input int      TP3Orders = 0;            // Number of orders for TP3
+input int      TP4Orders = 0;            // Number of orders for TP4
+input int      TP5Orders = 0;            // Number of orders for TP5
+input int      MagicNumber = 123456;
+input int      Slippage = 10;
+input string   SymbolPrefix = "";
+input string   SymbolSuffix = "";
+input bool     EnableAutoTrading = true;
+input bool     AllowRetrading = false;    // Allow re-trading same signal after manual close
+
+// TP2 Partial Close Settings
+input bool     TP2PartialClose = true;    // Close X% at TP2, let rest run
+input double   TP2ClosePercent = 50.0;    // Percentage to close at TP2 (default 50%)
+
+// TP3 Partial Close Settings
+input bool     TP3PartialClose = true;    // Close X% at TP3, let rest run
+input double   TP3ClosePercent = 50.0;    // Percentage to close at TP3 (default 50%)
+
+// TP4 Partial Close Settings
+input bool     TP4PartialClose = true;    // Close X% at TP4, let rest run
+input double   TP4ClosePercent = 50.0;    // Percentage to close at TP4 (default 50%)
+
+// TP5 Partial Close Settings
+input bool     TP5PartialClose = true;    // Close X% at TP5, let rest run
+input double   TP5ClosePercent = 100.0;   // Percentage to close at TP5 (default 100% - full close)
+
+CTrade g_trade;
+string g_botApiUrl = "";
+string g_processedSignals[];
+bool g_isConnected = false;  // Track connection status
+
+int OnInit()
+  {
+   if(StringLen(TelegramBotToken) == 0)
+     {
+      Comment("❌ ERROR: Please enter your Telegram Bot Token in EA settings!");
+      Print("ERROR: Telegram Bot Token is empty!");
+      return INIT_PARAMETERS_INCORRECT;
+     }
+
+   g_botApiUrl = "https://api.telegram.org/bot" + TelegramBotToken + "/";
+
+   g_trade.SetExpertMagicNumber(MagicNumber);
+   g_trade.SetDeviationInPoints(Slippage);
+   g_trade.SetTypeFilling(ORDER_FILLING_IOC);
+
+   if(!EventSetTimer(UpdateInterval))
+     {
+      Print("Failed to set timer!");
+      return INIT_FAILED;
+     }
+
+   Print("========================================");
+   Print("Telegram Signal EA v5.0 - Separate TP Orders");
+   Print("========================================");
+   Print("Auto-trading: ", (EnableAutoTrading ? "ENABLED ✅" : "DISABLED ⚠️"));
+   Print("Allow Retrading: ", (AllowRetrading ? "YES ✅" : "NO ❌"));
+   Print("Lot Size per Order: ", FixedLotSize);
+   Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+   Print("📊 ORDERS PER TP LEVEL:");
+   Print("TP1: ", TP1Orders, " orders × ", FixedLotSize, " = ", DoubleToString(FixedLotSize * TP1Orders, 2), " lots");
+   Print("TP2: ", TP2Orders, " orders × ", FixedLotSize, " = ", DoubleToString(FixedLotSize * TP2Orders, 2), " lots");
+   Print("TP3: ", TP3Orders, " orders × ", FixedLotSize, " = ", DoubleToString(FixedLotSize * TP3Orders, 2), " lots");
+   Print("TP4: ", TP4Orders, " orders × ", FixedLotSize, " = ", DoubleToString(FixedLotSize * TP4Orders, 2), " lots");
+   Print("TP5: ", TP5Orders, " orders × ", FixedLotSize, " = ", DoubleToString(FixedLotSize * TP5Orders, 2), " lots");
+   Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+   int totalOrders = TP1Orders + TP2Orders + TP3Orders + TP4Orders + TP5Orders;
+   Print("TOTAL: ", totalOrders, " orders = ", DoubleToString(FixedLotSize * totalOrders, 2), " lots");
+   Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+   Print("🎯 STRATEGY:");
+   Print("- TP1 & TP2 orders: Normal SL from signal");
+   Print("- TP3-TP5 orders: SL at entry (break-even)");
+   Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+   Print("📊 PARTIAL CLOSE SETTINGS:");
+
+   if(TP2PartialClose)
+      Print("  TP2: Close ", TP2ClosePercent, "%, let ", (100.0 - TP2ClosePercent), "% run");
+   else
+      Print("  TP2: Disabled");
+
+   if(TP3PartialClose)
+      Print("  TP3: Close ", TP3ClosePercent, "%, let ", (100.0 - TP3ClosePercent), "% run");
+   else
+      Print("  TP3: Disabled");
+
+   if(TP4PartialClose)
+      Print("  TP4: Close ", TP4ClosePercent, "%, let ", (100.0 - TP4ClosePercent), "% run");
+   else
+      Print("  TP4: Disabled");
+
+   if(TP5PartialClose)
+      Print("  TP5: Close ", TP5ClosePercent, "%");
+   else
+      Print("  TP5: Disabled");
+
+   Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+   Print("⚙️ SETTINGS:");
+   Print("Account Balance: $", AccountInfoDouble(ACCOUNT_BALANCE));
+   Print("Magic Number: ", MagicNumber);
+   Print("========================================");
+   Print("🔍 Testing Telegram API connection...");
+   Print("========================================");
+
+   Comment("🤖 Telegram Signal EA v5.0 Started\n",
+           "━━━━━━━━━━━━━━━━━━━━\n",
+           "Auto Trading: ", (EnableAutoTrading ? "ON ✅" : "OFF ⚠️"), "\n",
+           "Balance: $", DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2), "\n",
+           "8x TP1 + 2x TP2 = 10 orders 📊\n",
+           "━━━━━━━━━━━━━━━━━━━━\n",
+           "Testing connection...");
+   
+   // Test connection immediately
+   CheckNewMessages();
+   
+   return(INIT_SUCCEEDED);
+  }
+
+void OnDeinit(const int reason)
+  {
+   EventKillTimer();
+   Comment("");
+   Print("EA stopped. Reason: ", reason);
+  }
+
+void OnTimer()
+  {
+   CheckNewMessages();
+  }
+
+void OnTick()
+  {
+   CheckPartialClose();
+  }
+
+void CheckPartialClose()
+  {
+   // Check all open positions for TP partial close
+   for(int i = PositionsTotal() - 1; i >= 0; i--)
+     {
+      if(PositionSelectByTicket(PositionGetTicket(i)))
+        {
+         // Check if this is our position (magic number matches)
+         if(PositionGetInteger(POSITION_MAGIC) != MagicNumber)
+            continue;
+
+         string comment = PositionGetString(POSITION_COMMENT);
+         double volume = PositionGetDouble(POSITION_VOLUME);
+         ulong ticket = PositionGetInteger(POSITION_TICKET);
+         string symbol = PositionGetString(POSITION_SYMBOL);
+
+         // Check each TP level
+         string tpLevels[] = {"TP2:", "TP3:", "TP4:", "TP5:"};
+         bool tpEnabled[] = {TP2PartialClose, TP3PartialClose, TP4PartialClose, TP5PartialClose};
+         double tpPercent[] = {TP2ClosePercent, TP3ClosePercent, TP4ClosePercent, TP5ClosePercent};
+
+         for(int tpIdx = 0; tpIdx < 4; tpIdx++)
+           {
+            // Check if this TP level is enabled and position matches
+            if(!tpEnabled[tpIdx])
+               continue;
+
+            if(StringFind(comment, "TG " + tpLevels[tpIdx]) >= 0 && StringFind(comment, "[CLOSED]") == -1)
+              {
+               // Extract TP price from comment
+               int tpStart = StringFind(comment, tpLevels[tpIdx]);
+               if(tpStart >= 0)
+                 {
+                  tpStart += 4;  // Skip "TPX:"
+                  int tpEnd = StringFind(comment, ",", tpStart);
+                  if(tpEnd > tpStart)
+                    {
+                     string tpStr = StringSubstr(comment, tpStart, tpEnd - tpStart);
+                     double tpPrice = StringToDouble(tpStr);
+
+                     // Check if TP has been hit
+                     double currentPrice;
+                     if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY)
+                        currentPrice = SymbolInfoDouble(symbol, SYMBOL_BID);
+                     else
+                        currentPrice = SymbolInfoDouble(symbol, SYMBOL_ASK);
+
+                     bool tpHit = false;
+                     if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY && currentPrice >= tpPrice)
+                        tpHit = true;
+                     else if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_SELL && currentPrice <= tpPrice)
+                        tpHit = true;
+
+                     if(tpHit)
+                       {
+                        // Calculate volume to close (based on percentage)
+                        double closeVolume = NormalizeDouble(volume * tpPercent[tpIdx] / 100.0, 2);
+                        if(closeVolume > 0)
+                          {
+                           string tpName = StringSubstr(tpLevels[tpIdx], 0, 3);  // Extract "TP2", "TP3", etc.
+                           Print("🎯 ", tpName, " HIT! Closing ", tpPercent[tpIdx], "% of position #", ticket, " (", closeVolume, " lots)");
+                           Comment("🎯 ", tpName, " HIT! Closing ", tpPercent[tpIdx], "% of position #", ticket);
+
+                           // Close partial position
+                           if(PositionGetInteger(POSITION_TYPE) == POSITION_TYPE_BUY)
+                              g_trade.Sell(closeVolume, symbol, ticket);
+                           else
+                              g_trade.Buy(closeVolume, symbol, ticket);
+
+                           double remaining = volume - closeVolume;
+                           if(remaining > 0)
+                              Print("✅ Closed ", tpPercent[tpIdx], "% at ", tpName, ". Remaining ", remaining, " lots running with SL at entry.");
+                           else
+                              Print("✅ Closed 100% at ", tpName, ". Position fully closed.");
+                          }
+                        break;  // Only process the first matching TP level
+                       }
+                    }
+                 }
+              }
+           }
+        }
+     }
+  }
+
+void CheckNewMessages()
+  {
+   char data[];
+   char result[];
+   string headers = "";
+
+   string url = g_botApiUrl + "getUpdates?timeout=0";
+
+   int timeout = 5000;
+   ResetLastError();
+   
+   // Only show connection attempt if not yet connected
+   if(!g_isConnected)
+     {
+      Print("🔄 Attempting to connect to Telegram API...");
+      Print("URL: ", url);
+     }
+   
+   int res = WebRequest("GET", url, "", "", timeout, data, 0, result, headers);
+   
+   if(res == -1)
+     {
+      int error = GetLastError();
+      
+      // Mark as disconnected
+      g_isConnected = false;
+      
+      Print("❌ WebRequest FAILED! Error Code: ", error);
+      
+      if(error == 4060)
+        {
+         Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+         Print("ERROR 4060: URL NOT ALLOWED!");
+         Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+         Print("SOLUTION:");
+         Print("1. Go to: Tools → Options → Expert Advisors");
+         Print("2. Check: 'Allow WebRequest for listed URL'");
+         Print("3. Add URL: https://api.telegram.org");
+         Print("4. Click OK and RESTART MT5");
+         Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+         
+         Comment("❌ CONNECTION ERROR!\n",
+                 "━━━━━━━━━━━━━━━━━━━━\n",
+                 "Error 4060: URL Not Allowed\n\n",
+                 "FIX THIS NOW:\n",
+                 "1. Tools → Options → Expert Advisors\n",
+                 "2. Check 'Allow WebRequest for listed URL'\n",
+                 "3. Add: https://api.telegram.org\n",
+                 "4. Click OK\n",
+                 "5. RESTART MT5\n",
+                 "━━━━━━━━━━━━━━━━━━━━");
+        }
+      else if(error == 4014)
+        {
+         Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+         Print("ERROR 4014: INVALID BOT TOKEN!");
+         Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+         Print("Your Telegram Bot Token is invalid or empty");
+         Print("Bot Token: ", (StringLen(TelegramBotToken) > 0 ? "Present (length: " + IntegerToString(StringLen(TelegramBotToken)) + ")" : "EMPTY!"));
+         Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+         
+         Comment("❌ INVALID BOT TOKEN!\n",
+                 "━━━━━━━━━━━━━━━━━━━━\n",
+                 "Your bot token is invalid.\n\n",
+                 "FIX THIS:\n",
+                 "1. Go to Telegram @BotFather\n",
+                 "2. Create a bot or get your token\n",
+                 "3. Copy the FULL token\n",
+                 "4. Enter it in EA settings\n",
+                 "━━━━━━━━━━━━━━━━━━━━");
+        }
+      else if(error == 5203 || error == 5200)
+        {
+         Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+         Print("ERROR ", error, ": NO INTERNET CONNECTION!");
+         Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+         Print("Cannot reach Telegram servers");
+         Print("Check your internet connection");
+         Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+         
+         Comment("❌ NO INTERNET!\n",
+                 "━━━━━━━━━━━━━━━━━━━━\n",
+                 "Cannot connect to internet.\n\n",
+                 "Check:\n",
+                 "• Internet connection\n",
+                 "• Firewall settings\n",
+                 "• VPN (if using)\n",
+                 "━━━━━━━━━━━━━━━━━━━━");
+        }
+      else
+        {
+         Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+         Print("UNKNOWN ERROR: ", error);
+         Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+         
+         Comment("❌ WebRequest Error: ", error, "\n",
+                 "━━━━━━━━━━━━━━━━━━━━\n",
+                 "Check:\n",
+                 "• Internet connection\n",
+                 "• Bot token is correct\n",
+                 "• URL is whitelisted\n",
+                 "━━━━━━━━━━━━━━━━━━━━");
+        }
+      return;
+     }
+   
+   // Mark as connected and show success message only once
+   if(!g_isConnected)
+     {
+      Print("✅ Connected to Telegram API successfully!");
+      Print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+      g_isConnected = true;
+     }
+   
+   string response = CharArrayToString(result);
+   
+   ParseTelegramResponse(response);
+  }
+
+void ParseTelegramResponse(string response)
+  {
+   if(StringFind(response, "\"ok\":true") == -1)
+     {
+      Comment("❌ Telegram API Error\nCheck your bot token");
+      return;
+     }
+
+   int pos = 0;
+   int newSignalsProcessed = 0;
+
+   // Find all messages and check against cache
+   while(true)
+     {
+      int textPos = StringFind(response, "\"text\":", pos);
+      if(textPos == -1) break;
+
+      textPos += 8;
+      int textEndPos = StringFind(response, "\"", textPos);
+      if(textEndPos == -1) break;
+
+      string messageText = StringSubstr(response, textPos, textEndPos - textPos);
+
+      StringReplace(messageText, "\\n", "\n");
+      StringReplace(messageText, "\\r", "");
+      StringReplace(messageText, "\\/", "/");
+
+      // Check if this message contains a trading signal
+      string msgUpper = messageText;
+      StringToUpper(msgUpper);
+
+      // Skip status messages (TP hit, closed, etc.)
+      if(StringFind(msgUpper, "HIT") != -1 ||
+         StringFind(msgUpper, "CLOSED") != -1 ||
+         StringFind(msgUpper, "CLOSE") != -1 ||
+         StringFind(msgUpper, "SUCCESSFULL") != -1 ||
+         StringFind(msgUpper, "SUCCESSFUL") != -1 ||
+         StringFind(msgUpper, "PROFIT") != -1 ||
+         StringFind(msgUpper, "PIPS") != -1)
+        {
+         pos = textEndPos + 1;
+         continue;
+        }
+
+      if(StringLen(messageText) > 0 &&
+         (StringFind(msgUpper, "BUY") != -1 || StringFind(msgUpper, "SELL") != -1))
+        {
+         // Check if already in cache
+         bool isDuplicate = false;
+         for(int i = 0; i < ArraySize(g_processedSignals); i++)
+           {
+            if(g_processedSignals[i] == messageText)
+              {
+               isDuplicate = true;
+               break;
+              }
+           }
+
+         if(!isDuplicate)
+           {
+            // Add to cache
+            int newSize = ArraySize(g_processedSignals) + 1;
+            ArrayResize(g_processedSignals, newSize);
+            g_processedSignals[newSize - 1] = messageText;
+
+            // Limit cache size
+            if(ArraySize(g_processedSignals) > 100)
+              {
+               ArrayRemove(g_processedSignals, 0, 1);
+              }
+
+            Print("✅ New signal found and processed");
+            ProcessSignal(messageText);
+            newSignalsProcessed++;
+           }
+        }
+
+      pos = textEndPos + 1;
+     }
+
+   if(newSignalsProcessed > 0)
+     {
+      Print("━━━━━━━━━━━━━━━━━━━━");
+      Print("📊 New signals processed: ", newSignalsProcessed);
+      Print("Cache size: ", ArraySize(g_processedSignals));
+      Print("━━━━━━━━━━━━━━━━━━━━");
+     }
+   else
+     {
+      int totalOrders = TP1Orders + TP2Orders + TP3Orders + TP4Orders + TP5Orders;
+      Comment("🤖 Telegram Signal EA\n",
+              "Status: Monitoring ✅\n",
+              "Auto Trade: ", (EnableAutoTrading ? "ON" : "OFF"), "\n",
+              "Total Orders: ", totalOrders, "\n",
+              "Balance: $", DoubleToString(AccountInfoDouble(ACCOUNT_BALANCE), 2), "\n",
+              "8x TP1 + 2x TP2 (Signal SL) 📊\n",
+              "Cached signals: ", ArraySize(g_processedSignals), "\n",
+              "Check Experts tab for messages");
+     }
+  }
+
+void ProcessSignal(string messageText)
+  {
+   // Create uppercase version only for BUY/SELL check - don't destroy superscript characters!
+   string msgUpper = messageText;
+   StringToUpper(msgUpper);
+
+   if(StringFind(msgUpper, "BUY") == -1 && StringFind(msgUpper, "SELL") == -1)
+      return;
+
+   // Use original message for parsing to preserve superscript characters (¹, ², ³, ⁴, ⁵)
+   string msg = messageText;
+
+   // Decode Unicode escape sequences like \u00b2 to actual characters
+   int uPos = StringFind(msg, "\\u");
+   while(uPos >= 0)
+     {
+      if(uPos + 5 < StringLen(msg))
+        {
+         // Extract the 4-digit hex code
+         string hexCode = StringSubstr(msg, uPos + 2, 4);
+         // Convert hex to integer manually
+         int charCode = 0;
+         for(int h = 0; h < 4; h++)
+           {
+            int digit = 0;
+            string ch = StringSubstr(hexCode, h, 1);
+            if(ch >= "0" && ch <= "9")
+               digit = (int)StringToInteger(ch);
+            else if(ch >= "a" && ch <= "f")
+               digit = 10 + (int)(ch[0]) - (int)('a');
+            else if(ch >= "A" && ch <= "F")
+               digit = 10 + (int)(ch[0]) - (int)('A');
+            charCode = charCode * 16 + digit;
+           }
+         // Create the character
+         string charStr = ShortToString((ushort)charCode);
+         // Replace the escape sequence with the actual character
+         StringReplace(msg, StringSubstr(msg, uPos, 6), charStr);
+        }
+      else
+        {
+         break;
+        }
+      uPos = StringFind(msg, "\\u", uPos + 1);
+     }
+
+   string commentText = "📊 NEW SIGNAL DETECTED!\n";
+   commentText += "━━━━━━━━━━━━━━━━━━━━\n";
+   commentText += "Raw Message:\n" + messageText + "\n";
+   commentText += "━━━━━━━━━━━━━━━━━━━━\n";
+   
+   string symbol = "";
+   int orderType = -1;
+   double entryPrice = 0;
+   double tp1 = 0;
+   double tp2 = 0;
+   double tp3 = 0;
+   double tp4 = 0;
+   double tp5 = 0;
+   double sl = 0;
+   
+   // Replace non-breaking spaces (Unicode 0x00A0) with regular spaces before parsing
+   string nbSpace = CharToString((char)160);
+   StringReplace(msg, nbSpace, " ");
+
+   string lines[];
+   int lineCount = StringSplit(msg, '\n', lines);
+
+   if(lineCount < 2)
+     {
+      commentText += "❌ Invalid format: Too few lines\n";
+      Comment(commentText);
+      return;
+     }
+   
+   string firstLine = lines[0];
+   StringTrimLeft(firstLine);
+   StringTrimRight(firstLine);
+   
+   string words[];
+   int wordCount = StringSplit(firstLine, ' ', words);
+   
+   if(wordCount < 3)
+     {
+      commentText += "❌ Invalid format: First line incomplete\n";
+      Comment(commentText);
+      return;
+     }
+   
+   symbol = words[0];
+
+   // Strip # prefix if present
+   if(StringFind(symbol, "#") == 0)
+      symbol = StringSubstr(symbol, 1);
+
+   if(symbol == "GOLD" || symbol == "XAUUSD")
+      symbol = "XAUUSD";
+   else if(symbol == "US30" || symbol == "DOW")
+      symbol = "US30";
+   else if(symbol == "NAS100" || symbol == "NASDAQ")
+      symbol = "NAS100";
+   else if(symbol == "BTCUSD" || symbol == "BTC")
+      symbol = "BTCUSD";
+   
+   symbol = SymbolPrefix + symbol + SymbolSuffix;
+   
+   bool isBuy = false;
+   bool isSell = false;
+   
+   for(int i = 0; i < wordCount; i++)
+     {
+      if(words[i] == "BUY") isBuy = true;
+      if(words[i] == "SELL") isSell = true;
+     }
+   
+   if(isBuy)
+      orderType = ORDER_TYPE_BUY_LIMIT;
+   else if(isSell)
+      orderType = ORDER_TYPE_SELL_LIMIT;
+   else
+     {
+      commentText += "❌ No BUY/SELL found\n";
+      Comment(commentText);
+      return;
+     }
+
+   // Find entry price - look for first numeric value in first line (handles "5172/5175" - picks 5172)
+   entryPrice = 0;
+   for(int i = 0; i < wordCount; i++)
+     {
+      // Remove any trailing non-numeric characters (like trailing comma, slash, etc.)
+      string cleanWord = words[i];
+      int slashPos = StringFind(cleanWord, "/");
+      if(slashPos > 0)
+        cleanWord = StringSubstr(cleanWord, 0, slashPos);
+
+      double val = StringToDouble(cleanWord);
+      if(val > 0)
+        {
+         entryPrice = val;
+         break;
+        }
+     }
+   
+   // Track generic TP. sequence (1st TP. = TP1, 2nd TP. = TP2, etc.)
+   int genericTpCount = 0;
+
+   for(int i = 1; i < lineCount; i++)
+     {
+      string line = lines[i];
+      StringTrimLeft(line);
+      StringTrimRight(line);
+
+      // Parse generic TP. format (assign to TP1, TP2, TP3 based on order)
+      if(StringFind(line, "TP.") != -1)
+        {
+         string tpWords[];
+         StringSplit(line, ' ', tpWords);
+         for(int j = 0; j < ArraySize(tpWords); j++)
+           {
+            double val = StringToDouble(tpWords[j]);
+            if(val > 0)
+              {
+               genericTpCount++;
+               if(genericTpCount == 1 && tp1 == 0)
+                  tp1 = val;
+               else if(genericTpCount == 2 && tp2 == 0)
+                  tp2 = val;
+               else if(genericTpCount == 3 && tp3 == 0)
+                  tp3 = val;
+               else if(genericTpCount == 4 && tp4 == 0)
+                  tp4 = val;
+               else if(genericTpCount == 5 && tp5 == 0)
+                  tp5 = val;
+               break;
+              }
+           }
+        }
+
+      // Parse SL. format (same as SL)
+      if(StringFind(line, "SL.") != -1 && sl == 0)
+        {
+         string slWords[];
+         StringSplit(line, ' ', slWords);
+         for(int j = 0; j < ArraySize(slWords); j++)
+           {
+            double val = StringToDouble(slWords[j]);
+            if(val > 0)
+              {
+               sl = val;
+               break;
+              }
+           }
+        }
+
+      // Parse TP1 (handles TP¹, TP1, TP₁) - NOT generic "TP" or "TP²" etc
+      if((StringFind(line, "TP¹") != -1 || StringFind(line, "TP1") != -1 || StringFind(line, "TP₁") != -1) && tp1 == 0)
+        {
+         string tpWords[];
+         StringSplit(line, ' ', tpWords);
+         for(int j = 0; j < ArraySize(tpWords); j++)
+           {
+            double val = StringToDouble(tpWords[j]);
+            if(val > 0)
+              {
+               tp1 = val;
+               break;
+              }
+           }
+        }
+
+      // Parse TP2 (handles TP², TP2, TP₂)
+      if((StringFind(line, "TP²") != -1 || StringFind(line, "TP2") != -1 || StringFind(line, "TP₂") != -1) && tp2 == 0)
+        {
+         string tpWords[];
+         StringSplit(line, ' ', tpWords);
+         for(int j = 0; j < ArraySize(tpWords); j++)
+           {
+            double val = StringToDouble(tpWords[j]);
+            if(val > 0)
+              {
+               tp2 = val;
+               break;
+              }
+           }
+        }
+
+      // Parse TP3 (handles TP³, TP3, TP₃)
+      if((StringFind(line, "TP³") != -1 || StringFind(line, "TP3") != -1 || StringFind(line, "TP₃") != -1) && tp3 == 0)
+        {
+         string tpWords[];
+         StringSplit(line, ' ', tpWords);
+         for(int j = 0; j < ArraySize(tpWords); j++)
+           {
+            double val = StringToDouble(tpWords[j]);
+            if(val > 0)
+              {
+               tp3 = val;
+               break;
+              }
+           }
+        }
+
+      // Parse TP4 (handles TP⁴, TP4, TP₄)
+      if((StringFind(line, "TP⁴") != -1 || StringFind(line, "TP4") != -1 || StringFind(line, "TP₄") != -1) && tp4 == 0)
+        {
+         string tpWords[];
+         StringSplit(line, ' ', tpWords);
+         for(int j = 0; j < ArraySize(tpWords); j++)
+           {
+            double val = StringToDouble(tpWords[j]);
+            if(val > 0)
+              {
+               tp4 = val;
+               break;
+              }
+           }
+        }
+
+      // Parse TP5 (handles TP⁵, TP5, TP₅)
+      if((StringFind(line, "TP⁵") != -1 || StringFind(line, "TP5") != -1 || StringFind(line, "TP₅") != -1) && tp5 == 0)
+        {
+         string tpWords[];
+         StringSplit(line, ' ', tpWords);
+         for(int j = 0; j < ArraySize(tpWords); j++)
+           {
+            double val = StringToDouble(tpWords[j]);
+            if(val > 0)
+              {
+               tp5 = val;
+               break;
+              }
+           }
+        }
+
+      if(StringFind(line, "SL") != -1 && sl == 0)
+        {
+         string slWords[];
+         StringSplit(line, ' ', slWords);
+         for(int j = 0; j < ArraySize(slWords); j++)
+           {
+            double val = StringToDouble(slWords[j]);
+            if(val > 0)
+              {
+               sl = val;
+               break;
+              }
+           }
+        }
+     }
+   
+   commentText += "\n📋 PARSED DATA:\n";
+   commentText += "Symbol: " + symbol + "\n";
+   commentText += "Type: " + (orderType == ORDER_TYPE_BUY_LIMIT ? "BUY LIMIT" : "SELL LIMIT") + "\n";
+   commentText += "Entry: " + DoubleToString(entryPrice, 2) + "\n";
+   commentText += "TP1: " + DoubleToString(tp1, 2) + "\n";
+   if(tp2 > 0) commentText += "TP2: " + DoubleToString(tp2, 2) + "\n";
+   if(tp3 > 0) commentText += "TP3: " + DoubleToString(tp3, 2) + "\n";
+   if(tp4 > 0) commentText += "TP4: " + DoubleToString(tp4, 2) + "\n";
+   if(tp5 > 0) commentText += "TP5: " + DoubleToString(tp5, 2) + "\n";
+   commentText += "SL: " + DoubleToString(sl, 2) + "\n";
+   commentText += "━━━━━━━━━━━━━━━━━━━━\n";
+
+   if(symbol == "" || entryPrice == 0 || tp1 == 0 || sl == 0)
+     {
+      commentText += "❌ INCOMPLETE DATA - Cannot trade\n";
+      Comment(commentText);
+      return;
+     }
+   
+   // Duplicate detection based on entry price only
+   // This allows same symbol with different TP/SL levels
+   string signalSignature = symbol + "_" + 
+                           (orderType == ORDER_TYPE_BUY_LIMIT ? "BUY" : "SELL") + "_" +
+                           DoubleToString(entryPrice, 2);
+   
+   Print("🔍 Checking signal: ", signalSignature);
+   Print("📦 Processed signals in cache: ", ArraySize(g_processedSignals));
+   Print("🔄 Allow Retrading: ", (AllowRetrading ? "YES" : "NO"));
+   
+   bool isAlreadyProcessed = false;
+   for(int i = 0; i < ArraySize(g_processedSignals); i++)
+     {
+      if(g_processedSignals[i] == signalSignature)
+        {
+         isAlreadyProcessed = true;
+         Print("⚠️ Signal found in cache at position: ", i);
+         break;
+        }
+     }
+   
+   if(isAlreadyProcessed && !AllowRetrading)
+     {
+      Print("❌ BLOCKED: Signal already processed and AllowRetrading = false");
+      commentText += "⚠️ DUPLICATE ENTRY PRICE\n";
+      commentText += "Same entry price already processed.\n";
+      commentText += "Entry: " + DoubleToString(entryPrice, 2) + "\n";
+      commentText += "To allow retrading, set AllowRetrading = true\n";
+      Comment(commentText);
+      return;
+     }
+   
+   if(isAlreadyProcessed && AllowRetrading)
+     {
+      Print("⚠️ Signal was processed before, but AllowRetrading = true, so proceeding...");
+     }
+   
+   // Add to processed signals (only if not already there)
+   if(!isAlreadyProcessed)
+     {
+      int newSize = ArraySize(g_processedSignals) + 1;
+      ArrayResize(g_processedSignals, newSize);
+      g_processedSignals[newSize - 1] = signalSignature;
+      
+      if(ArraySize(g_processedSignals) > 50)
+        {
+         ArrayRemove(g_processedSignals, 0, 1);
+        }
+      
+      Print("✅ Signal added to cache. Total cached: ", ArraySize(g_processedSignals));
+     }
+   
+   Print("✅ New signal accepted - Entry: ", entryPrice, " TP1: ", tp1, " TP2: ", tp2, " TP3: ", tp3, " TP4: ", tp4, " TP5: ", tp5, " SL: ", sl);
+   
+   if(!SymbolSelect(symbol, true))
+     {
+      commentText += "❌ Symbol not found: " + symbol + "\n";
+      commentText += "💡 Try adjusting Symbol Prefix/Suffix\n";
+      Comment(commentText);
+      return;
+     }
+   
+   if(!EnableAutoTrading)
+     {
+      commentText += "⚠️ AUTO TRADING DISABLED\n";
+      commentText += "Enable it in EA settings to trade\n";
+      Comment(commentText);
+      return;
+     }
+   
+   bool success = ExecuteMultipleLimitOrders(symbol, orderType, entryPrice, tp1, tp2, tp3, tp4, tp5, sl, commentText);
+   
+   Comment(commentText);
+  }
+
+bool ExecuteMultipleLimitOrders(string symbol, int orderType, double price, double tp1, double tp2, double tp3, double tp4, double tp5, double sl, string &commentText)
+{
+   int digits = (int)SymbolInfoInteger(symbol, SYMBOL_DIGITS);
+   price = NormalizeDouble(price, digits);
+   tp1 = NormalizeDouble(tp1, digits);
+   sl = NormalizeDouble(sl, digits);
+
+   double minLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MIN);
+   double maxLot = SymbolInfoDouble(symbol, SYMBOL_VOLUME_MAX);
+   double lotStep = SymbolInfoDouble(symbol, SYMBOL_VOLUME_STEP);
+
+   double lot = FixedLotSize;
+   if(lot < minLot) lot = minLot;
+   if(lot > maxLot) lot = maxLot;
+
+   lot = MathFloor(lot / lotStep) * lotStep;
+   lot = NormalizeDouble(lot, 2);
+
+   int successCount = 0;
+   int failCount = 0;
+   int totalPlaced = 0;
+
+   commentText += "\n🔄 PLACING ORDERS BY TP LEVEL:\n";
+   commentText += "━━━━━━━━━━━━━━━━━━━━\n";
+
+   // Place TP1 orders
+   if(TP1Orders > 0 && tp1 > 0)
+     {
+      commentText += "📍 TP1: Placing " + IntegerToString(TP1Orders) + " orders\n";
+      for(int i = 1; i <= TP1Orders; i++)
+        {
+         bool result = false;
+         string tpData = "TP1:" + DoubleToString(tp1, 5) + ",SL:" + DoubleToString(sl, 5);
+
+         if(orderType == ORDER_TYPE_BUY_LIMIT)
+           result = g_trade.BuyLimit(lot, price, symbol, sl, tp1, ORDER_TIME_GTC, 0, "TG " + tpData);
+         else if(orderType == ORDER_TYPE_SELL_LIMIT)
+           result = g_trade.SellLimit(lot, price, symbol, sl, tp1, ORDER_TIME_GTC, 0, "TG " + tpData);
+
+         if(result)
+           {
+            successCount++;
+            totalPlaced++;
+            Print("✅ TP1 Order ", i, "/", TP1Orders, " placed: TP1=", tp1);
+           }
+         else
+           {
+            failCount++;
+            Print("❌ TP1 Order ", i, " failed");
+           }
+         Sleep(50);
+        }
+     }
+
+   // Place TP2 orders (use signal SL, same as TP1)
+   if(TP2Orders > 0 && tp2 > 0)
+     {
+      commentText += "📍 TP2: Placing " + IntegerToString(TP2Orders) + " orders\n";
+      for(int i = 1; i <= TP2Orders; i++)
+        {
+         bool result = false;
+         string tpData = "TP2:" + DoubleToString(tp2, 5) + ",SL:" + DoubleToString(sl, 5);
+
+         if(orderType == ORDER_TYPE_BUY_LIMIT)
+           result = g_trade.BuyLimit(lot, price, symbol, sl, tp2, ORDER_TIME_GTC, 0, "TG " + tpData);
+         else if(orderType == ORDER_TYPE_SELL_LIMIT)
+           result = g_trade.SellLimit(lot, price, symbol, sl, tp2, ORDER_TIME_GTC, 0, "TG " + tpData);
+
+         if(result)
+           {
+            successCount++;
+            totalPlaced++;
+            Print("✅ TP2 Order ", i, "/", TP2Orders, " placed: TP2=", tp2);
+           }
+         else
+           {
+            failCount++;
+            Print("❌ TP2 Order ", i, " failed");
+           }
+         Sleep(50);
+        }
+     }
+
+   // Place TP3 orders (SL = entry price for break-even)
+   if(TP3Orders > 0 && tp3 > 0)
+     {
+      commentText += "📍 TP3: Placing " + IntegerToString(TP3Orders) + " orders (SL=ENTRY)\n";
+      for(int i = 1; i <= TP3Orders; i++)
+        {
+         bool result = false;
+         string tpData = "TP3:" + DoubleToString(tp3, 5) + ",SL:ENTRY";
+
+         if(orderType == ORDER_TYPE_BUY_LIMIT)
+           result = g_trade.BuyLimit(lot, price, symbol, price, tp3, ORDER_TIME_GTC, 0, "TG " + tpData);
+         else if(orderType == ORDER_TYPE_SELL_LIMIT)
+           result = g_trade.SellLimit(lot, price, symbol, price, tp3, ORDER_TIME_GTC, 0, "TG " + tpData);
+
+         if(result)
+           {
+            successCount++;
+            totalPlaced++;
+            Print("✅ TP3 Order ", i, "/", TP3Orders, " placed: TP3=", tp3, " SL=ENTRY");
+           }
+         else
+           {
+            failCount++;
+            Print("❌ TP3 Order ", i, " failed");
+           }
+         Sleep(50);
+        }
+     }
+
+   // Place TP4 orders (SL = entry price for break-even)
+   if(TP4Orders > 0 && tp4 > 0)
+     {
+      commentText += "📍 TP4: Placing " + IntegerToString(TP4Orders) + " orders (SL=ENTRY)\n";
+      for(int i = 1; i <= TP4Orders; i++)
+        {
+         bool result = false;
+         string tpData = "TP4:" + DoubleToString(tp4, 5) + ",SL:ENTRY";
+
+         if(orderType == ORDER_TYPE_BUY_LIMIT)
+           result = g_trade.BuyLimit(lot, price, symbol, price, tp4, ORDER_TIME_GTC, 0, "TG " + tpData);
+         else if(orderType == ORDER_TYPE_SELL_LIMIT)
+           result = g_trade.SellLimit(lot, price, symbol, price, tp4, ORDER_TIME_GTC, 0, "TG " + tpData);
+
+         if(result)
+           {
+            successCount++;
+            totalPlaced++;
+            Print("✅ TP4 Order ", i, "/", TP4Orders, " placed: TP4=", tp4, " SL=ENTRY");
+           }
+         else
+           {
+            failCount++;
+            Print("❌ TP4 Order ", i, " failed");
+           }
+         Sleep(50);
+        }
+     }
+
+   // Place TP5 orders (SL = entry price for break-even)
+   if(TP5Orders > 0 && tp5 > 0)
+     {
+      commentText += "📍 TP5: Placing " + IntegerToString(TP5Orders) + " orders (SL=ENTRY)\n";
+      for(int i = 1; i <= TP5Orders; i++)
+        {
+         bool result = false;
+         string tpData = "TP5:" + DoubleToString(tp5, 5) + ",SL:ENTRY";
+
+         if(orderType == ORDER_TYPE_BUY_LIMIT)
+           result = g_trade.BuyLimit(lot, price, symbol, price, tp5, ORDER_TIME_GTC, 0, "TG " + tpData);
+         else if(orderType == ORDER_TYPE_SELL_LIMIT)
+           result = g_trade.SellLimit(lot, price, symbol, price, tp5, ORDER_TIME_GTC, 0, "TG " + tpData);
+
+         if(result)
+           {
+            successCount++;
+            totalPlaced++;
+            Print("✅ TP5 Order ", i, "/", TP5Orders, " placed: TP5=", tp5, " SL=ENTRY");
+           }
+         else
+           {
+            failCount++;
+            Print("❌ TP5 Order ", i, " failed");
+           }
+         Sleep(50);
+        }
+     }
+
+   commentText += "━━━━━━━━━━━━━━━━━━━━\n";
+   commentText += "📊 SUMMARY:\n";
+   commentText += "✅ Successful: " + IntegerToString(successCount) + "\n";
+   commentText += "❌ Failed: " + IntegerToString(failCount) + "\n";
+   commentText += "📦 Total Lot Size: " + DoubleToString(lot * totalPlaced, 2) + "\n";
+   commentText += "\n💡 TP1 & TP2: Normal SL from signal\n";
+
+   return (successCount > 0);
+  }
+
+bool OrderExists(string symbol, int orderType, double price)
+  {
+   int total = OrdersTotal();
+   
+   for(int i = 0; i < total; i++)
+     {
+      ulong ticket = OrderGetTicket(i);
+      if(ticket > 0)
+        {
+         if(OrderGetString(ORDER_SYMBOL) == symbol &&
+            OrderGetInteger(ORDER_TYPE) == orderType &&
+            OrderGetInteger(ORDER_MAGIC) == MagicNumber)
+           {
+            double orderPrice = OrderGetDouble(ORDER_PRICE_OPEN);
+            if(MathAbs(orderPrice - price) < SymbolInfoDouble(symbol, SYMBOL_POINT) * 50)
+               return true;
+           }
+        }
+     }
+   
+   return false;
+  }
+//+------------------------------------------------------------------+

@@ -171,7 +171,7 @@ async function createMt5AccountWithConfig(
       multiplier: 1.0,
       maxLotSize: 0.02,  // Maximum lot size per position
       maximumLot: 0.2,   // Maximum total exposure
-      maxOpenPositions: 10,  // Maximum number of open trades
+      maxOpenPositions: 8,  // Maximum number of open trades (Default: TP1 Only)
       copyStopLoss: true,
       copyTakeProfit: true,
       scaleType: { id: 1 },  // "No scaling" - copy exact lot sizes

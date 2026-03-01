@@ -34,6 +34,7 @@ const pendingSettingsChanges = new Map<string, {
   maxOpenPositions?: number
   copyStopLoss?: boolean
   copyTakeProfit?: boolean
+  tp2Enabled?: boolean
 }>()
 
 // Promo expiration settings
@@ -704,13 +705,14 @@ ${message}
   // Get all unique telegram user IDs
   let recipients: { telegramUserId: string }[] = []
 
-  if (args.includes('--everyone') && planType === 'all' && !activeOnly) {
-    // Send to EVERYONE in the User table if specified
+  if (planType === 'all' && !activeOnly) {
+    // Default for /broadcast: Send to EVERYONE in the User table
     recipients = await prisma.user.findMany({
       select: { telegramUserId: true }
     })
+    console.log(`[Broadcast] Targeting ALL users from User table: ${recipients.length} recipients`)
   } else {
-    // Default: Get unique telegram user IDs from subscriptions
+    // Filtered broadcast: Get unique telegram user IDs from subscriptions
     const subs = await prisma.subscription.findMany({
       where: whereClause,
       select: {
@@ -719,6 +721,7 @@ ${message}
       distinct: ['telegramUserId']
     })
     recipients = subs
+    console.log(`[Broadcast] Targeting filtered users from Subscription table: ${recipients.length} recipients`)
   }
 
   // Send message to each user
@@ -1533,7 +1536,8 @@ Configure your trade copying settings:
       maximumLot: subscription.mt5Setup.maximumLot || 0.2,
       maxOpenPositions: subscription.mt5Setup.maxOpenPositions,
       copyStopLoss: subscription.mt5Setup.copyStopLoss,
-      copyTakeProfit: subscription.mt5Setup.copyTakeProfit
+      copyTakeProfit: subscription.mt5Setup.copyTakeProfit,
+      tp2Enabled: subscription.mt5Setup.tp2Enabled
     })
   )
 }
@@ -1582,6 +1586,7 @@ Use /mt5setup to get started.`)
 🔢 Max Positions: ${mt5.maxOpenPositions}
 🛑 Copy SL: ${mt5.copyStopLoss ? '✅' : '❌'}
 🎯 Copy TP: ${mt5.copyTakeProfit ? '✅' : '❌'}
+🚀 Take TP2: ${mt5.tp2Enabled ? '✅' : '❌'}
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -2976,6 +2981,58 @@ Click Save to apply changes.`,
       )
     }
   }
+  else if (data === 'settings_tp2') {
+    const userId = user.id.toString()
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: userId,
+        hasCopierAccess: true,
+        isRemoved: false,
+        expiresAt: { gte: new Date() }
+      },
+      include: { mt5Setup: true },
+      orderBy: { createdAt: 'desc' }
+    })
+
+    if (subscription?.mt5Setup && messageId) {
+      // Toggle TP2 preference
+      const current = pendingSettingsChanges.get(userId) || {}
+      const newVal = current.tp2Enabled !== undefined ? !current.tp2Enabled : !subscription.mt5Setup.tp2Enabled
+
+      // When TP2 is disabled, we force maxOpenPositions to 8 (TP1 Only)
+      // When TP2 is enabled, we force it back to 10 (Default)
+      pendingSettingsChanges.set(userId, {
+        ...current,
+        tp2Enabled: newVal,
+        maxOpenPositions: newVal ? 10 : 8
+      })
+
+      await answerCallbackQuery(callbackId, `TP2 Trades ${newVal ? 'ENABLED' : 'DISABLED'}`)
+
+      // Refresh menu
+      await editMessageText(
+        user.id,
+        messageId,
+        `⚙️ <b>Copier Settings</b> (Unsaved)
+        
+━━━━━━━━━━━━━━━━━━━
+
+Configure your trade copying settings:
+
+━━━━━━━━━━━━━━━━━━━`,
+        settingsKeyboard({
+          copierMultiplier: subscription.mt5Setup.copierMultiplier,
+          lotSize: current.lotSize ?? (subscription.mt5Setup.lotSize || 0.01),
+          maxLotSize: current.maxLotSize ?? subscription.mt5Setup.maxLotSize,
+          maximumLot: current.maximumLot ?? (subscription.mt5Setup.maximumLot || 0.2),
+          maxOpenPositions: newVal ? 10 : 8,
+          copyStopLoss: current.copyStopLoss ?? subscription.mt5Setup.copyStopLoss,
+          copyTakeProfit: current.copyTakeProfit ?? subscription.mt5Setup.copyTakeProfit,
+          tp2Enabled: newVal
+        })
+      )
+    }
+  }
   else if (data === 'settings_save') {
     // Get pending settings
     const pending = pendingSettingsChanges.get(userId)
@@ -3028,7 +3085,7 @@ Please complete MT5 setup first with /mt5setup`)
         maxOpenPositions: pending.maxOpenPositions ?? subscription.mt5Setup.maxOpenPositions,
         copyStopLoss: pending.copyStopLoss ?? subscription.mt5Setup.copyStopLoss,
         copyTakeProfit: pending.copyTakeProfit ?? subscription.mt5Setup.copyTakeProfit,
-        metacopierAccountIndex: subscription.mt5Setup.metacopierAccountIndex ?? 0 // Use the same account index that was used during setup
+        metacopierAccountIndex: subscription.mt5Setup.metacopierAccountIndex ?? 0
       }
 
       // Update MetaCopier
@@ -3044,7 +3101,8 @@ Please complete MT5 setup first with /mt5setup`)
           maximumLot: updateParams.maximumLot,
           maxOpenPositions: updateParams.maxOpenPositions,
           copyStopLoss: updateParams.copyStopLoss,
-          copyTakeProfit: updateParams.copyTakeProfit
+          copyTakeProfit: updateParams.copyTakeProfit,
+          tp2Enabled: pending.tp2Enabled ?? subscription.mt5Setup.tp2Enabled
         }
       })
 
@@ -3061,6 +3119,7 @@ ${pending.lotSize !== undefined ? `📊 Lot Size: ${pending.lotSize} lots\n` : '
 ${pending.maxLotSize !== undefined ? `📏 Max Lot Per Trade: ${updateParams.maxLotSize}\n` : ''}
 ${pending.maximumLot !== undefined ? `📊 Max Total Exposure: ${updateParams.maximumLot}\n` : ''}
 ${pending.maxOpenPositions !== undefined ? `🔢 Max Positions: ${updateParams.maxOpenPositions}\n` : ''}
+${pending.tp2Enabled !== undefined ? `🚀 TP2 Trades: ${pending.tp2Enabled ? 'ENABLED ✅' : 'DISABLED ❌'}\n` : ''}
 
 ━━━━━━━━━━━━━━━━━━━
 

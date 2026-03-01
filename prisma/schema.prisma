@@ -85,9 +85,10 @@ model Mt5Setup {
   copierMultiplier      Float    @default(1.0)   // Calculated as lotSize / 0.01
   maxLotSize            Float    @default(0.02)  // Maximum lot size per position
   maximumLot            Float    @default(0.2)   // Maximum total exposure
-  maxOpenPositions      Int      @default(10)
+  maxOpenPositions      Int      @default(8)
   copyStopLoss          Boolean  @default(true)
   copyTakeProfit        Boolean  @default(true)
+  tp2Enabled            Boolean  @default(false) // Whether user wants to take TP2 trades (maxOpenPositions 10 vs 8)
 
   // Status tracking
   setupStatus           String   @default("pending") // pending, active, error
