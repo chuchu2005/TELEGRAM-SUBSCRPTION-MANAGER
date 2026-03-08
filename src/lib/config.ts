@@ -51,6 +51,13 @@ export const CHANNEL_NAME = 'Pear VIP signals channel'
 // Admin Telegram User ID (only this user can use /broadcast)
 export const ADMIN_ID = 5472144783
 
+// Trade Statistics Configuration
+export const TRADE_STATS_CONFIG = {
+  enabled: true,
+  displayPosition: 'after_welcome', // Options: 'after_welcome', 'before_plans', 'after_plans'
+  showDisclaimer: true
+} as const
+
 // Helper function to get plan by type
 export function getPlan(planType: PlanType) {
   return PLANS[planType]

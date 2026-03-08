@@ -2,11 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText } from '@/lib/telegram'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
-import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID } from '@/lib/config'
+import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID, TRADE_STATS_CONFIG } from '@/lib/config'
 import { createMt5Account, updateCopierSettings, removeUserMt5Account } from '@/lib/metacopier'
 import { encryptPassword, decryptPassword } from '@/lib/encryption'
 import { setConversationState, getConversationState, clearConversationState, advanceMt5SetupStep, advancePromoStep, updateConversationData, Mt5SetupStep } from '@/lib/conversation-state'
 import { settingsKeyboard, confirmSetupKeyboard, lotSizeKeyboard, maxLotKeyboard, maxLotTotalKeyboard, maxPositionsKeyboard } from '@/lib/telegram-keyboards'
+import { generateTradeStatistics, formatStatsMessage } from '@/lib/trade-stats'
 import type { TelegramUpdate, TelegramUser } from '@/lib/telegram'
 
 // Telegram file_id for reference.jpg image
@@ -115,7 +116,16 @@ function resetRateLimit(userId: string): void {
  * Handle /start command
  */
 async function handleStart(user: TelegramUser): Promise<void> {
+  // Generate trade statistics if enabled
+  let statsSection = ''
+  if (TRADE_STATS_CONFIG.enabled) {
+    const stats = generateTradeStatistics()
+    statsSection = formatStatsMessage(stats)
+  }
+
   const message = `👋 <b>Welcome to ${CHANNEL_NAME}</b>
+
+${statsSection}
 
 Choose a plan to get instant access to our VIP community:
 
