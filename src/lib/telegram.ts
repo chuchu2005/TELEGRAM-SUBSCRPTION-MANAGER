@@ -267,6 +267,9 @@ export async function banChatMember(userId: string | number): Promise<boolean> {
     })
 
     const data = await response.json()
+    if (!data.ok) {
+      console.error(`banChatMember failed for user ${userId}: ${data.description || 'Unknown reason'} (error_code: ${data.error_code})`)
+    }
     return data.ok
   } catch (error) {
     console.error('Error banning chat member:', error)
