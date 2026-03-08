@@ -3561,6 +3561,11 @@ Or send /cancel to exit.`
       }
 
       // Handle pay button clicks from inline keyboards
+      if (data === 'start_trial') {
+        await handleTrial(from)
+        return NextResponse.json({ ok: true })
+      }
+
       if (data === 'pay') {
         await handlePay(from)
         return NextResponse.json({ ok: true })
