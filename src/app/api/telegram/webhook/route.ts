@@ -267,24 +267,6 @@ async function handleTrial(user: TelegramUser): Promise<void> {
     return
   }
 
-  // Check if user has active subscription
-  const activeSubscription = await prisma.subscription.findFirst({
-    where: {
-      telegramUserId: user.id.toString(),
-      expiresAt: { gt: new Date() },
-      isRemoved: false
-    }
-  })
-
-  if (activeSubscription) {
-    await sendMessage(user.id, `You already have an active subscription!
-
-Your trial will start when your current plan expires.
-
-Type /status to check your subscription details.`)
-    return
-  }
-
   // Create trial subscription
   const expiresAt = new Date()
   expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours from now
@@ -348,7 +330,7 @@ When you see results, upgrade to keep access permanently.
 
   await sendMessageWithKeyboard(user.id, message, {
     inline_keyboard: [[
-      { text: '🎁 Start FREE Trial', callback_data: 'start_trial' }
+      { text: '💳 Upgrade to Paid Plan', callback_data: 'pay' }
     ]]
   })
 }
@@ -3520,13 +3502,15 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
-      // Answer the callback query to remove the loading state
+      // Answer the callback query to remove the loading state - use context-appropriate text
+      const isVerifyCallback = data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo' || data === 'verify_premium'
+
       await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           callback_query_id: id,
-          text: '✅ Please send your transaction reference'
+          ...(isVerifyCallback ? { text: '✅ Please send your transaction reference' } : {})
         })
       })
 
