@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PLANS, PlanType } from '@/lib/config'
+import { PLANS, PlanType, TRIAL_DISCOUNT } from '@/lib/config'
+import { prisma } from '@/lib/prisma'
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY!
 const APP_URL = process.env.NEXT_PUBLIC_APP_URL!
@@ -40,6 +41,31 @@ export async function POST(request: NextRequest) {
     // Get plan details
     const plan = PLANS[planType]
     const planName = plan.name.charAt(0).toUpperCase() + plan.name.slice(1)
+    let amountKobo: number = plan.amountKobo
+
+    // Check discount eligibility if it's a standard paid plan (not promo or trial)
+    if (planType !== 'trial' && planType !== 'promo' && TRIAL_DISCOUNT.enabled) {
+      const now = new Date()
+      const twentyFourHoursAgo = new Date(now.getTime() - (TRIAL_DISCOUNT.discountDurationHours * 60 * 60 * 1000))
+
+      const recentTrial = await prisma.subscription.findFirst({
+        where: {
+          telegramUserId: telegramId.toString(),
+          planType: 'trial',
+          expiresAt: { gte: twentyFourHoursAgo }
+        },
+        orderBy: { expiresAt: 'desc' }
+      })
+
+      if (recentTrial && recentTrial.expiresAt >= twentyFourHoursAgo) {
+        const hoursSinceTrial = Math.floor((now.getTime() - recentTrial.expiresAt.getTime()) / (60 * 60 * 1000))
+        const hoursRemaining = Math.max(0, TRIAL_DISCOUNT.discountDurationHours - hoursSinceTrial)
+        if (hoursRemaining > 0) {
+          // Apply 20% discount
+          amountKobo = Math.floor(amountKobo * (1 - TRIAL_DISCOUNT.discountPercent / 100))
+        }
+      }
+    }
 
     // Use provided email or fallback
     const customerEmail = email || `customer_${telegramId}@example.com`
@@ -53,7 +79,7 @@ export async function POST(request: NextRequest) {
       },
       body: JSON.stringify({
         email: customerEmail,
-        amount: plan.amountKobo,
+        amount: amountKobo,
         currency: 'NGN',
         channels: ['bank_transfer'], // ONLY bank transfer
         metadata: {
@@ -100,7 +126,7 @@ export async function POST(request: NextRequest) {
       authorizationUrl: paystackData.data.authorization_url,
       reference: paystackData.data.reference,
       plan: planType,
-      amount: plan.amountKobo
+      amount: amountKobo
     })
   } catch (error) {
     console.error('Error creating payment link:', error)

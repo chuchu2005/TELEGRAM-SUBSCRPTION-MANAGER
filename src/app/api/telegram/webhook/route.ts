@@ -184,7 +184,7 @@ ${statsSection}
 
 Choose a plan to get instant access to our VIP community:
 
-💎 <b>Basic Plan</b> - ₦5,000
+💎 <b>Basic Plan</b> - ${trialEligible ? '₦4,000' : '₦5,000'} ${trialEligible ? '<s> (was ₦5,000)</s>' : ''}
 ├─ <b>7 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Perfect for trying out
@@ -199,7 +199,7 @@ Choose a plan to get instant access to our VIP community:
 ├─ You copy trades manually
 └─ Best value for serious traders
 
-👑 <b>Premium Plan - AUTO COPIER</b> - ₦22,000 ⭐
+👑 <b>Premium Plan - AUTO COPIER</b> - ${trialEligible ? '₦17,600' : '₦22,000'} ⭐ ${trialEligible ? '<s> (was ₦22,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
 ├─ 🤖 <b>AUTO COPIER BOT</b> - We copy trades FOR YOU!
 ├─ Trades execute <b>instantly</b> on your MT5
@@ -1516,8 +1516,33 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
     }
 
     // Validate plan amount
-    const expectedAmount = PLANS[planType].amountKobo
+    let expectedAmount: number = PLANS[planType].amountKobo
     const vPlanName = PLANS[planType].name
+
+    // Check discount eligibility if it's a standard paid plan (not promo or trial)
+    if (planType !== 'trial' && planType !== 'promo' && TRIAL_DISCOUNT.enabled) {
+      const now = new Date()
+      const twentyFourHoursAgo = new Date(now.getTime() - (TRIAL_DISCOUNT.discountDurationHours * 60 * 60 * 1000))
+
+      const recentTrial = await prisma.subscription.findFirst({
+        where: {
+          telegramUserId: userId,
+          planType: 'trial',
+          expiresAt: { gte: twentyFourHoursAgo }
+        },
+        orderBy: { expiresAt: 'desc' }
+      })
+
+      if (recentTrial && recentTrial.expiresAt >= twentyFourHoursAgo) {
+        const hoursSinceTrial = Math.floor((now.getTime() - recentTrial.expiresAt.getTime()) / (60 * 60 * 1000))
+        const hoursRemaining = Math.max(0, TRIAL_DISCOUNT.discountDurationHours - hoursSinceTrial)
+        if (hoursRemaining > 0) {
+          // Apply 20% discount
+          expectedAmount = Math.floor(expectedAmount * (1 - TRIAL_DISCOUNT.discountPercent / 100))
+        }
+      }
+    }
+
     if (!validatePaymentAmount(verification.amount!, expectedAmount).valid) {
       await sendMessage(user.id, `❌ <b>Amount Mismatch!</b>\n\nThis payment does not match the ${vPlanName} plan.`)
       return
