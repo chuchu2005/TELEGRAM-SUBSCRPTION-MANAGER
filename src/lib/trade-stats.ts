@@ -17,7 +17,7 @@ export interface TradeStatistics {
 
 export const TRADE_STATS_RANGES = {
   totalTrades: { min: 80, max: 150 },
-  winRate: { min: 75, max: 95 }, // Percentage
+  winRate: { min: 95, max: 95 }, // Fixed at 95% win rate (5% loss)
   profitPerTrade: { min: 15, max: 35 }, // USD average per winning trade
   lossPerTrade: { min: 10, max: 25 }, // USD average per losing trade
   pipsPerWin: { min: 10, max: 25 },

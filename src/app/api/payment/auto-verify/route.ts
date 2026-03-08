@@ -120,18 +120,9 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    // Check if user was previously removed and unban them
-    const previousRemovedSubscriptions = await prisma.subscription.findMany({
-      where: {
-        telegramUserId: telegramId,
-        isRemoved: true
-      }
-    })
-
-    if (previousRemovedSubscriptions.length > 0) {
-      await unbanChatMember(telegramId)
-      console.log(`Unbanned user ${telegramId} who is repaying`)
-    }
+    // Always unban user before creating invite link (safety measure)
+    await unbanChatMember(telegramId)
+    console.log(`Unbanned user ${telegramId} before sending invite link`)
 
     // Create invite link
     const inviteLink = await createInviteLink()

@@ -127,6 +127,18 @@ async function handleStart(user: TelegramUser): Promise<void> {
 
 ${statsSection}
 
+━━━━━━━━━━━━━━━━━━━
+
+📈 <b>VIP Group Trading Performance:</b>
+
+💎 <b>Gold (XAUUSD) Signals:</b>
+• 3-4 trades dropped daily
+• 96% win rate on XAUUSD
+• Premium quality signals
+• Entry/Exit points provided
+
+━━━━━━━━━━━━━━━━━━━
+
 Choose a plan to get instant access to our VIP community:
 
 💎 <b>Basic Plan</b> - ₦5,000

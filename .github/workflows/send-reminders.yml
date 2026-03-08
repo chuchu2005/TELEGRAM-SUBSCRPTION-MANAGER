@@ -1,0 +1,16 @@
+name: Send Renewal Reminders
+
+on:
+  schedule:
+    # Run daily at 9:00 AM UTC
+    - cron: '0 9 * * *'
+  workflow_dispatch: # Allow manual triggering
+
+jobs:
+  send-reminders:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Cron Job
+        run: |
+          curl -X POST "${{ secrets.PRODUCTION_URL }}/api/cron/send-reminders"
