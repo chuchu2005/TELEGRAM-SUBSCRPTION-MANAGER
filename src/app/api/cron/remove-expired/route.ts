@@ -121,6 +121,17 @@ User has been removed from channel and MetaCopier.`)
           continue // Skip the ban and the expiry message
         }
 
+        // Safety: Never ban admins
+        if (subscription.telegramUserId === ADMIN_ID.toString()) {
+          console.log(`Skipping ban for admin user ${subscription.telegramUserId}`)
+          await prisma.subscription.update({
+            where: { id: subscription.id },
+            data: { isRemoved: true, removedAt: now }
+          })
+          removedCount++
+          continue
+        }
+
         // Attempt to ban/remove user from channel
         const banned = await banChatMember(subscription.telegramUserId)
 

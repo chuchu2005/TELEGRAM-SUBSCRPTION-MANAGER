@@ -909,14 +909,16 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
 
 <b>Usage:</b>
 /broadcast Your message here
+/broadcast Message | Button Text | callback_data
+
+<b>Examples:</b>
+/broadcast 🎉 Special offer this week!
+/broadcast 🔥 PROMO: ₦3,000 for 7 days! | 🔥 Get Promo | pay_promo
 
 <b>Available commands:</b>
 /broadcast - Send to everyone
 /broadcast_active - Send to active subscribers only
-/broadcast_premium - Send to premium users only
-
-<b>Example:</b>
-/broadcast 🎉 Special offer this week!`)
+/broadcast_premium - Send to premium users only`)
     return
   }
 
@@ -975,9 +977,24 @@ ${message}
   let failedCount = 0
   const failedUsers: string[] = []
 
+  // Support for optional button in broadcast: "Your message | Button Text | callback_data"
+  // Example: "/broadcast 🎉 BIG PROMO! | 🔥 Pay ₦3,000 | pay_promo"
+  const messageParts = message.split('|').map(p => p.trim())
+  const cleanMessage = messageParts[0]
+  const buttonText = messageParts[1]
+  const callbackData = messageParts[2]
+
   for (const recipient of recipients) {
     try {
-      const sent = await sendMessage(recipient.telegramUserId, message)
+      let sent = false
+      if (buttonText && callbackData) {
+        sent = await sendMessageWithKeyboard(recipient.telegramUserId, cleanMessage, {
+          inline_keyboard: [[{ text: buttonText, callback_data: callbackData }]]
+        })
+      } else {
+        sent = await sendMessage(recipient.telegramUserId, cleanMessage)
+      }
+
       if (sent) {
         successCount++
       } else {
@@ -987,7 +1004,7 @@ ${message}
       failedCount++
     }
 
-    // Add delay to avoid rate limiting (20 messages per second)
+    // Add delay to avoid rate limiting
     await new Promise(resolve => setTimeout(resolve, 100))
   }
 
