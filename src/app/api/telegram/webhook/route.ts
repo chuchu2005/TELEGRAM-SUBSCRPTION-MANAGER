@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText } from '@/lib/telegram'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
-import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID, TRADE_STATS_CONFIG } from '@/lib/config'
+import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID, TRADE_STATS_CONFIG, TRIAL_DISCOUNT } from '@/lib/config'
 import { createMt5Account, updateCopierSettings, removeUserMt5Account } from '@/lib/metacopier'
 import { encryptPassword, decryptPassword } from '@/lib/encryption'
 import { setConversationState, getConversationState, clearConversationState, advanceMt5SetupStep, advancePromoStep, updateConversationData, Mt5SetupStep } from '@/lib/conversation-state'
@@ -20,6 +20,9 @@ const rateLimitStore = new Map<string, { count: number; blockedUntil: number }>(
 
 // Store users waiting for email input
 const pendingEmailUsers = new Set<string>()
+
+// Store users waiting for promo email input
+const pendingPromoEmailUsers = new Set<string>()
 
 // Store users waiting to verify payment (userId -> planType)
 const pendingVerificationUsers = new Map<string, PlanType>()
@@ -123,6 +126,32 @@ async function handleStart(user: TelegramUser): Promise<void> {
     statsSection = formatStatsMessage(stats)
   }
 
+  const telegramUserId = user.id.toString()
+
+  // Check if user has a recent trial (eligible for 20% discount)
+  let trialEligible = false
+  if (TRIAL_DISCOUNT.enabled) {
+    const now = new Date()
+    const twentyFourHoursAgo = new Date(now.getTime() - (TRIAL_DISCOUNT.discountDurationHours * 60 * 60 * 1000))
+
+    const recentTrial = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: telegramUserId,
+        planType: 'trial',
+        expiresAt: { gte: twentyFourHoursAgo }
+      },
+      orderBy: { expiresAt: 'desc' }
+    })
+
+    if (recentTrial && recentTrial.expiresAt >= twentyFourHoursAgo) {
+      const hoursSinceTrial = Math.floor((now.getTime() - recentTrial.expiresAt.getTime()) / (60 * 60 * 1000))
+      const hoursRemaining = Math.max(0, TRIAL_DISCOUNT.discountDurationHours - hoursSinceTrial)
+      if (hoursRemaining > 0) {
+        trialEligible = true
+      }
+    }
+  }
+
   const message = `👋 <b>Welcome to ${CHANNEL_NAME}</b>
 
 ${statsSection}
@@ -139,6 +168,20 @@ ${statsSection}
 
 ━━━━━━━━━━━━━━━━━━━
 
+🎁 <b>Not Sure Yet? Try FREE for 24 Hours!</b>
+
+• Full access to VIP Gold (XAUUSD) signals
+• See 3-4 trades with 96% win rate
+• Entry & Exit points included
+• No payment required
+• Cancel anytime
+
+━━━━━━━━━━━━━━━━━━━
+
+🎁 <b>Tap to Start Your FREE 24-Hour Trial!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
 Choose a plan to get instant access to our VIP community:
 
 💎 <b>Basic Plan</b> - ₦5,000
@@ -146,12 +189,12 @@ Choose a plan to get instant access to our VIP community:
 ├─ You copy trades manually
 └─ Perfect for trying out
 
-📊 <b>Bi-Weekly Plan</b> - ₦10,000
+📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦8,000' : '₦10,000'} ${trialEligible ? '<s> (was ₦10,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Great balance of price & duration
 
-📅 <b>Monthly Plan</b> - ₦15,000
+📅 <b>Monthly Plan</b> - ${trialEligible ? '₦12,000' : '₦15,000'} ${trialEligible ? '<s> (was ₦15,000)</s>' : ''}
 ├─ <b>30 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Best value for serious traders
@@ -199,6 +242,109 @@ Choose a plan to get instant access to our VIP community:
 <i>Type /pay to get started</i>`
 
   await sendMessage(user.id, message)
+}
+
+/**
+ * Handle /trial command
+ */
+async function handleTrial(user: TelegramUser): Promise<void> {
+  // Check if user has ANY previous subscription history (trials or paid plans)
+  const previousSubs = await prisma.subscription.count({
+    where: {
+      telegramUserId: user.id.toString()
+    }
+  })
+
+  // Block existing or previous customers from taking a free trial
+  if (previousSubs > 0) {
+    await sendMessage(user.id, `❌ <b>You're Already a VIP!</b>\n\nFree trials are only available for new users.\n\nTo get VIP signals, upgrade to a paid plan:\n\n💎 Basic: ₦5,000 (7 days)\n📊 Bi-Weekly: ₦10,000 (14 days)\n📅 Monthly: ₦15,000 (30 days)\n👑 Premium: ₦22,000 (14 days + Copier)\n\nType /pay to get started.`)
+    return
+  }
+
+  // Check if user has active subscription
+  const activeSubscription = await prisma.subscription.findFirst({
+    where: {
+      telegramUserId: user.id.toString(),
+      expiresAt: { gt: new Date() },
+      isRemoved: false
+    }
+  })
+
+  if (activeSubscription) {
+    await sendMessage(user.id, `You already have an active subscription!
+
+Your trial will start when your current plan expires.
+
+Type /status to check your subscription details.`)
+    return
+  }
+
+  // Create trial subscription
+  const expiresAt = new Date()
+  expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours from now
+
+  // Always unban user before creating invite link (safety measure)
+  await unbanChatMember(user.id)
+  console.log(`Unbanned user ${user.id} before sending trial invite link`)
+
+  const inviteLink = await createInviteLink()
+
+  if (!inviteLink) {
+    await sendMessage(user.id, `Sorry, couldn't create invite link. Try again.`)
+    return
+  }
+
+  await prisma.subscription.create({
+    data: {
+      telegramUserId: user.id.toString(),
+      telegramUsername: user.username,
+      telegramName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User',
+      paystackRef: `TRIAL_${Date.now()}_${user.id}`, // Unique reference
+      amountKobo: 0,
+      planType: 'trial',
+      hasCopierAccess: false,
+      startedAt: new Date(),
+      expiresAt,
+      inviteLinkUsed: inviteLink
+    }
+  })
+
+  // Send trial welcome message with conversion hooks
+  const message = `🎁 <b>Your FREE 24-Hour Trial Has Started!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+✅ <b>What You Get:</b>
+• Access to VIP Gold (XAUUSD) signals
+• 3-4 high-quality signals daily
+• 96% win rate on Gold
+• Entry & Exit points
+• Real-time trade notifications
+
+━━━━━━━━━━━━━━━━━━━
+
+⏰ <b>Trial Expires:</b> ${formatDate(expiresAt)}
+
+⏱ <b>Time Remaining:</b> 24 hours
+
+━━━━━━━━━━━━━━━━━━━
+
+Your one-time invite link (valid for 24 hours):
+👉 ${inviteLink}
+
+━━━━━━━━━━━━━━━━━━━
+
+💡 <b>Pro Tip:</b>
+Watch our signals for 24 hours and see the quality!
+When you see results, upgrade to keep access permanently.
+
+<b>Want to upgrade now?</b> Type /pay anytime!`
+
+  await sendMessageWithKeyboard(user.id, message, {
+    inline_keyboard: [[
+      { text: '🎁 Start FREE Trial', callback_data: 'start_trial' }
+    ]]
+  })
 }
 
 /**
@@ -312,6 +458,37 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
   // Remove from pending list
   pendingEmailUsers.delete(telegramUserId)
 
+  // Check if user has a recent trial (eligible for 20% discount)
+  let hasRecentTrial = false
+  let trialEligible = false
+  if (TRIAL_DISCOUNT.enabled) {
+    const now = new Date()
+    const twentyFourHoursAgo = new Date(now.getTime() - (TRIAL_DISCOUNT.discountDurationHours * 60 * 60 * 1000))
+
+    const recentTrial = await prisma.subscription.findFirst({
+      where: {
+        telegramUserId: telegramUserId,
+        planType: 'trial',
+        expiresAt: { gte: twentyFourHoursAgo }
+      },
+      orderBy: { expiresAt: 'desc' }
+    })
+
+    if (recentTrial && recentTrial.expiresAt >= twentyFourHoursAgo) {
+      // Trial ended within the discount window
+      const hoursSinceTrial = Math.floor((now.getTime() - recentTrial.expiresAt.getTime()) / (60 * 60 * 1000))
+      const hoursRemaining = Math.max(0, TRIAL_DISCOUNT.discountDurationHours - hoursSinceTrial)
+
+      if (hoursRemaining > 0) {
+        hasRecentTrial = true
+        trialEligible = true
+      }
+    }
+  }
+
+  // Remove from pending list
+  pendingEmailUsers.delete(telegramUserId)
+
   try {
     console.log('Creating payment links for user:', telegramUserId, 'email:', email)
 
@@ -387,22 +564,33 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
 
 💳 <b>Step 2: Choose Your Plan</b>
 
-💎 <b>Basic Plan</b> - ₦5,000
+${trialEligible ? `
+━━━━━━━━━━━━━━━━━━━
+
+${TRIAL_DISCOUNT.discountMessage}
+
+━━━━━━━━━━━━━━━━━━━
+
+💎 Special Prices (20% OFF):
+
+` : ''}
+
+💎 <b>Basic Plan</b> - ${trialEligible ? '₦4,000' : '₦5,000'}
 ├─ <b>7 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ For trying out
 
-📊 <b>Bi-Weekly Plan</b> - ₦10,000
+📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦8,000' : '₦10,000'} ${trialEligible ? '<s> (was ₦10,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Great balance of price & duration
 
-📅 <b>Monthly Plan</b> - ₦15,000
+📅 <b>Monthly Plan</b> - ${trialEligible ? '₦12,000' : '₦15,000'} ${trialEligible ? '<s> (was ₦15,000)</s>' : ''}
 ├─ <b>30 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Best for consistent trading
 
-👑 <b>Premium - AUTO COPIER</b> - ₦22,000 ⭐
+👑 <b>Premium - AUTO COPIER</b> - ${trialEligible ? '₦17,600' : '₦22,000'} ⭐ ${trialEligible ? '<s> (was ₦22,000)</s>' : ''}
 ├─ <b>14 days</b> VIP signals + <b>AUTO COPIER BOT</b>
 ├─ 🤖 Trades copy <b>automatically</b> to your MT5
 ├─ 💰 Make money while you sleep
@@ -416,6 +604,15 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
 
 Stop missing trades while you sleep/busy.
 Let our bot copy trades FOR you 24/7!
+
+${trialEligible ? `
+━━━━━━━━━━━━━━━━━━━
+
+⏰ <b>LIMITED TIME OFFER!</b>
+
+This 20% discount is only valid for ${TRIAL_DISCOUNT.discountDurationHours} hours after your trial ended.
+
+━━━━━━━━━━━━━━━━━━━` : ''}
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -494,6 +691,71 @@ Still have questions? Send /help`
 }
 
 /**
+ * Handle promo pay command - Collect email, then show promo payment options
+ */
+async function handlePromoPay(user: TelegramUser): Promise<void> {
+  const telegramUserId = user.id.toString()
+  pendingPromoEmailUsers.add(telegramUserId)
+  await sendMessage(user.id, `📧 <b>Step 1: Enter Your Email</b>\n\nPlease provide your email address to continue with your promo.\n\n<b>Why do we need this?</b>\n✅ To send your official payment receipt\n✅ To help if there are any issues\n✅ To notify you before expiration\n\n━━━━━━━━━━━━━━━━━━━\n\n<i>Just type your email (e.g., john@email.com)</i>\n\n<i>Or send /cancel to exit</i>`)
+}
+
+/**
+ * Show promo payment button after collecting email
+ */
+async function showPromoPaymentButton(user: TelegramUser, email: string): Promise<void> {
+  const telegramUserId = user.id.toString()
+  const telegramUsername = user.username || 'unknown'
+
+  pendingPromoEmailUsers.delete(telegramUserId)
+
+  try {
+    const promoResponse = await fetch(`${APP_URL}/api/payment/link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: telegramUserId,
+        telegramUsername,
+        planType: 'promo',
+        email
+      })
+    })
+
+    const promoData = await promoResponse.json()
+
+    if (!promoData.success) {
+      await sendMessage(user.id, '❌ Failed to generate promo payment link. Please try again later.')
+      return
+    }
+
+    const message = `✅ <b>Email Confirmed:</b> ${email}\n\n━━━━━━━━━━━━━━━━━━━\n\n🔥 <b>SPECIAL PROMO OFFER - ₦3,000 (7 Days)</b>\n\nTap below to pay securely:`
+
+    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: user.id,
+        text: message,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '🔥 Pay ₦3,000 Now', url: promoData.authorizationUrl }
+            ],
+            [
+              { text: '✅ Verify Promo Payment', callback_data: 'verify_promo' }
+            ]
+          ]
+        }
+      })
+    })
+
+  } catch (error) {
+    console.error('Error showing promo payment button:', error)
+    await sendMessage(user.id, '❌ Error generating payment links. Please try again later.')
+  }
+}
+
+/**
  * Validate email format
  */
 function isValidEmail(email: string): boolean {
@@ -542,29 +804,6 @@ async function handleBroadcastPromo(user: TelegramUser): Promise<void> {
   }
 
   const broadcastTimestamp = Date.now()
-
-  // Create FRESH promo payment link for this broadcast
-  // Note: User will provide their actual email during payment
-  const promoResponse = await fetch(`${APP_URL}/api/payment/link`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      telegramId: ADMIN_ID.toString(),
-      telegramUsername: 'admin',
-      planType: 'promo',
-      email: 'promo@pearvip.com', // Generic email - user provides theirs during payment
-      metadata: {
-        broadcastTimestamp: broadcastTimestamp.toString() // Timestamp stored in metadata
-      }
-    })
-  })
-
-  const promoData = await promoResponse.json()
-
-  if (!promoData.success) {
-    await sendMessage(user.id, '❌ Failed to generate promo payment link. Please try again.')
-    return
-  }
 
   // Get ALL users (send to everyone, including previous buyers)
   const allUsers = await prisma.subscription.findMany({
@@ -634,10 +873,7 @@ Perfect for:
           reply_markup: {
             inline_keyboard: [
               [
-                { text: '🔥 Get ₦3,000 Promo (7 Days)', url: promoData.authorizationUrl }
-              ],
-              [
-                { text: '✅ Verify Promo Payment', callback_data: 'verify_promo' }
+                { text: '🔥 Get ₦3,000 Promo (7 Days)', callback_data: 'pay_promo' }
               ]
             ]
           }
@@ -1130,7 +1366,7 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
       if (customPromo.isFree) {
         const expiresAt = calculateExpiryDate(customPromo.planType as PlanType, currentExpiry)
 
-        await prisma.subscription.create({
+        const newSubscription = await prisma.subscription.create({
           data: {
             telegramUserId: userId,
             telegramUsername: user.username,
@@ -1144,6 +1380,18 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
             inviteLinkUsed: lastActiveSub?.inviteLinkUsed || ''
           }
         })
+
+        // Migrate MT5 setup from old active sub if renewing a copier plan
+        if (customPromo.hasCopierAccess) {
+          const activeMt5 = await prisma.mt5Setup.findFirst({
+            where: { subscription: { telegramUserId: userId, isRemoved: false, id: { not: newSubscription.id } } },
+            orderBy: { createdAt: 'desc' }
+          })
+          if (activeMt5) {
+            await prisma.mt5Setup.update({ where: { id: activeMt5.id }, data: { subscriptionId: newSubscription.id } })
+            console.log(`Migrated MT5 setup ${activeMt5.id} to promo subscription ${newSubscription.id}`)
+          }
+        }
 
         await prisma.promoCode.update({
           where: { code: promoCode },
@@ -1195,7 +1443,7 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
       const plan: PlanType = promoCode === 'VIP' ? 'basic' : 'premium'
       const expiresAt = calculateExpiryDate(plan, currentExpiry)
 
-      await prisma.subscription.create({
+      const newSubscription = await prisma.subscription.create({
         data: {
           telegramUserId: userId,
           telegramUsername: user.username,
@@ -1209,6 +1457,18 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
           inviteLinkUsed: lastActiveSub?.inviteLinkUsed || ''
         }
       })
+
+      // Migrate MT5 setup from old active sub if renewing a copier plan
+      if (plan === 'premium') {
+        const activeMt5 = await prisma.mt5Setup.findFirst({
+          where: { subscription: { telegramUserId: userId, isRemoved: false, id: { not: newSubscription.id } } },
+          orderBy: { createdAt: 'desc' }
+        })
+        if (activeMt5) {
+          await prisma.mt5Setup.update({ where: { id: activeMt5.id }, data: { subscriptionId: newSubscription.id } })
+          console.log(`Migrated MT5 setup ${activeMt5.id} to promo subscription ${newSubscription.id}`)
+        }
+      }
 
       let inviteLink = lastActiveSub?.inviteLinkUsed || await createInviteLink() || ''
       await sendMessage(user.id, `🎉 <b>${promoCode} Activated!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}\n\n━━━━━━━━━━━━━━━━━━━\n\n${lastActiveSub ? 'Your access has been extended!' : `🔗 <b>Join Channel:</b>\n${inviteLink}`}`)
@@ -1260,8 +1520,9 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
     // Stacking logic for paid plans
     const expiresAt = calculateExpiryDate(planType, currentExpiry)
 
+    let newSubscription;
     try {
-      await prisma.subscription.create({
+      newSubscription = await prisma.subscription.create({
         data: {
           telegramUserId: userId,
           telegramUsername: user.username,
@@ -1276,6 +1537,18 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
           inviteLinkUsed: lastActiveSub?.inviteLinkUsed || ''
         }
       })
+
+      // Migrate existing MT5 Setup so it stays active across overlapping premium plans
+      if (PLANS[planType].hasCopierAccess) {
+        const activeMt5 = await prisma.mt5Setup.findFirst({
+          where: { subscription: { telegramUserId: userId, isRemoved: false, id: { not: newSubscription.id } } },
+          orderBy: { createdAt: 'desc' }
+        })
+        if (activeMt5) {
+          await prisma.mt5Setup.update({ where: { id: activeMt5.id }, data: { subscriptionId: newSubscription.id } })
+          console.log(`Migrated MT5 setup ${activeMt5.id} from older subscription to new subscription ${newSubscription.id}`)
+        }
+      }
     } catch (e) {
       console.error('Save error:', e)
       await sendMessage(user.id, '❌ <b>Database Error</b>\n\nFailed to save your subscription. Please contact support.')
@@ -1294,8 +1567,15 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
 
     // AUTO-FLOW for Premium (Copier Access)
     if (PLANS[planType].hasCopierAccess) {
-      await setConversationState(userId, { step: 'account_number', data: {} })
-      await sendMessage(user.id, `🤖 <b>Copier Access Detected!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\nLet's set up your MT5 Copier.\n\nPlease send your <b>MT5 Account Number</b> to begin!`)
+      const currentMt5 = await prisma.mt5Setup.findUnique({
+        where: { subscriptionId: newSubscription.id }
+      })
+
+      // If no setup was migrated, prompt them as a new user
+      if (!currentMt5) {
+        await setConversationState(userId, { step: 'account_number', data: {} })
+        await sendMessage(user.id, `🤖 <b>Copier Access Detected!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\nLet's set up your MT5 Copier.\n\nPlease send your <b>MT5 Account Number</b> to begin!`)
+      }
     }
   } catch (error) {
     console.error('Verify error:', error)
@@ -3265,6 +3545,17 @@ Or send /cancel to exit.`
         return NextResponse.json({ ok: true })
       }
 
+      // Handle pay button clicks from inline keyboards
+      if (data === 'pay') {
+        await handlePay(from)
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'pay_promo') {
+        await handlePromoPay(from)
+        return NextResponse.json({ ok: true })
+      }
+
       return NextResponse.json({ ok: true })
     }
 
@@ -3334,6 +3625,9 @@ Or send /cancel to exit.`
               case '/help':
                 await handleHelp(from)
                 break
+              case 'start_trial':
+                await handleTrial(from)
+                break
               default:
                 // If not specifically handled here, let it fall through to normal switch
                 // with the new command/args if we were to modify them.
@@ -3381,6 +3675,19 @@ Or send /cancel to exit.`
 
       // Verify the payment
       await handleVerify(from, reference, planType)
+      return NextResponse.json({ ok: true })
+    }
+
+    // Check if user is waiting for promo email input
+    if (pendingPromoEmailUsers.has(userId) && !command.startsWith('/')) {
+      const email = text!.trim()
+
+      if (!isValidEmail(email)) {
+        await sendMessage(from.id, `❌ <b>Invalid email format</b>\n\nPlease enter a valid email address.\n\n<i>Type your email again or send /cancel to exit</i>`)
+        return NextResponse.json({ ok: true })
+      }
+
+      await showPromoPaymentButton(from, email)
       return NextResponse.json({ ok: true })
     }
 
@@ -3441,6 +3748,10 @@ Please enter a valid email address.
 
       case '/pay':
         await handlePay(from)
+        break
+
+      case '/trial':
+        await handleTrial(from)
         break
 
       case '/cancel':

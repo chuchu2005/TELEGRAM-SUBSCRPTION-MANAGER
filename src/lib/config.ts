@@ -30,6 +30,12 @@ export const PLANS = {
     amountKobo: 300000,  // NGN 3,000
     durationDays: 7,
     hasCopierAccess: false
+  },
+  trial: {
+    name: 'Free Trial',
+    amountKobo: 0,  // FREE
+    durationDays: 1,  // 24 hours
+    hasCopierAccess: false
   }
 } as const
 
@@ -56,6 +62,14 @@ export const TRADE_STATS_CONFIG = {
   enabled: true,
   displayPosition: 'after_welcome', // Options: 'after_welcome', 'before_plans', 'after_plans'
   showDisclaimer: true
+} as const
+
+// Trial Discount Configuration
+export const TRIAL_DISCOUNT = {
+  enabled: true,
+  discountPercent: 20, // 20% discount for trial users upgrading
+  discountDurationHours: 24, // Discount valid for 24 hours after trial ends
+  discountMessage: '🎉 EXCLUSIVE TRIAL OFFER! Upgrade within 24 hours and get 20% OFF all plans!'
 } as const
 
 // Helper function to get plan by type

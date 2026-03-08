@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { banChatMember, sendMessage } from '@/lib/telegram'
+import { banChatMember, sendMessage, sendMessageWithKeyboard } from '@/lib/telegram'
 import { removeUserMt5Account } from '@/lib/metacopier'
 import { ADMIN_ID } from '@/lib/config'
 
@@ -96,6 +96,31 @@ User has been removed from channel and MetaCopier.`)
           }
         }
 
+        // Check if user has ANOTHER active subscription before banning
+        const hasOtherActiveSub = await prisma.subscription.findFirst({
+          where: {
+            telegramUserId: subscription.telegramUserId,
+            expiresAt: { gt: now },
+            isRemoved: false,
+            id: { not: subscription.id }
+          }
+        })
+
+        if (hasOtherActiveSub) {
+          // Just mark this old subscription as removed
+          await prisma.subscription.update({
+            where: { id: subscription.id },
+            data: {
+              isRemoved: true,
+              removedAt: now
+            }
+          })
+
+          removedCount++
+          console.log(`Silently removed old subscription ${subscription.id} for user ${subscription.telegramUserId} (has another active sub)`)
+          continue // Skip the ban and the expiry message
+        }
+
         // Attempt to ban/remove user from channel
         const banned = await banChatMember(subscription.telegramUserId)
 
@@ -109,10 +134,53 @@ User has been removed from channel and MetaCopier.`)
             }
           })
 
-          // Send notification to user
-          await sendMessage(
-            subscription.telegramUserId,
-            `⏰ <b>Your subscription has expired.</b>
+          // Send notification to user (different message for trials vs paid plans)
+          let expiryMessage = ''
+
+          if (subscription.planType === 'trial') {
+            expiryMessage = `⏰ <b>Your Free Trial Has Ended!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Thank you for trying our VIP signals!
+
+<b>We hope you saw our 96% win rate on XAUUSD!</b>
+During your 24-hour trial, you received 3-4 high-quality Gold signals daily.
+
+━━━━━━━━━━━━━━━━━━━
+
+❌ <b>What You're Missing Now:</b>
+• No more XAUUSD signals (3-4 daily)
+• No more 96% win rate trades
+• No entry/exit notifications
+• No premium community access
+
+━━━━━━━━━━━━━━━━━━━
+
+💎 <b>UPGRADE NOW & Continue Winning!</b>
+
+Don't lose momentum - get back in the game!
+
+━━━━━━━━━━━━━━━━━━━
+
+🎁 <b>SPECIAL OFFER - 20% OFF!</b>
+Because you just completed your trial, we're giving you a 20% discount on ALL plans!
+<i>(Valid for the next 24 hours only)</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+💎 Basic: ₦4,000 <s>(was ₦5,000)</s> - 7 days
+📊 Bi-Weekly: ₦8,000 <s>(was ₦10,000)</s> - 14 days
+📅 Monthly: ₦12,000 <s>(was ₦15,000)</s> - 30 days
+👑 Premium: ₦17,600 <s>(was ₦22,000)</s> - 14 days + Copier
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Quick Upgrade:</b> Type /pay
+
+Or use this button to upgrade now!`
+          } else {
+            expiryMessage = `⏰ <b>Your subscription has expired.</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -131,7 +199,29 @@ Just tap the button below to make a new payment!
 ━━━━━━━━━━━━━━━━━━━
 
 Or type /pay to get started.`
-          )
+          }
+
+          if (subscription.planType === 'trial') {
+            await sendMessageWithKeyboard(
+              subscription.telegramUserId,
+              expiryMessage,
+              {
+                inline_keyboard: [[
+                  { text: '💳 Upgrade Now (20% OFF)', callback_data: 'pay' }
+                ]]
+              }
+            )
+          } else {
+            await sendMessageWithKeyboard(
+              subscription.telegramUserId,
+              expiryMessage,
+              {
+                inline_keyboard: [[
+                  { text: '💳 Renew Subscription', callback_data: 'pay' }
+                ]]
+              }
+            )
+          }
 
           removedCount++
           console.log(`Removed user ${subscription.telegramUserId} (subscription ${subscription.id})`)
