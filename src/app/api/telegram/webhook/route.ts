@@ -3578,7 +3578,7 @@ Or send /cancel to exit.`
       }
 
       // Handle pay button clicks from inline keyboards
-      if (data === 'start_trial') {
+      if (data === 'start_trial' || data === 'trial') {
         await handleTrial(from)
         return NextResponse.json({ ok: true })
       }
@@ -3588,8 +3588,18 @@ Or send /cancel to exit.`
         return NextResponse.json({ ok: true })
       }
 
-      if (data === 'pay_promo') {
+      if (data === 'pay_promo' || data === 'promo') {
         await handlePromoPay(from)
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'status') {
+        await handleStatus(from)
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'help') {
+        await handleHelp(from)
         return NextResponse.json({ ok: true })
       }
 
