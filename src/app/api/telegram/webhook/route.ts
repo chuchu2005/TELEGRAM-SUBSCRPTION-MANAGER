@@ -263,7 +263,24 @@ async function handleTrial(user: TelegramUser): Promise<void> {
 
   // Block existing or previous customers from taking a free trial
   if (previousSubs > 0) {
-    await sendMessage(user.id, `❌ <b>You're Already a VIP!</b>\n\nFree trials are only available for new users.\n\nTo get VIP signals, upgrade to a paid plan:\n\n💎 Basic: ₦5,000 (7 days)\n📊 Bi-Weekly: ₦10,000 (14 days)\n📅 Monthly: ₦15,000 (30 days)\n👑 Premium: ₦22,000 (14 days + Copier)\n\nType /pay to get started.`)
+    const message = `❌ <b>You're Already a VIP!</b>
+
+Free trials are only available for new users.
+
+To get VIP signals, upgrade to a paid plan:
+
+💎 Basic: ₦5,000 (7 days)
+📊 Bi-Weekly: ₦10,000 (14 days)
+📅 Monthly: ₦15,000 (30 days)
+👑 Premium: ₦22,000 (14 days + Copier)
+
+Tap below to get started!`
+
+    await sendMessageWithKeyboard(user.id, message, {
+      inline_keyboard: [[
+        { text: '💳 Upgrade to Paid Plan', callback_data: 'pay' }
+      ]]
+    })
     return
   }
 
