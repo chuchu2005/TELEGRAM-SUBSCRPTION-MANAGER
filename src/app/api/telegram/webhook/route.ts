@@ -241,7 +241,13 @@ Choose a plan to get instant access to our VIP community:
 
 <i>Type /pay to get started</i>`
 
-  await sendMessage(user.id, message)
+  await sendMessageWithKeyboard(user.id, message, {
+    inline_keyboard: [
+      [
+        { text: '🎁 Start Your FREE 24-Hour Trial! 🎁', callback_data: 'start_trial' }
+      ]
+    ]
+  })
 }
 
 /**
