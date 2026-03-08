@@ -615,10 +615,10 @@ Then send: /verify_basic REFERENCE
 
 Or send /pay to start over
 
-💎 Pay ₦5,000 (Basic - 7 days)
-📊 Pay ₦10,000 (Bi-Weekly - 14 days)
-📅 Pay ₦15,000 (Monthly - 30 days)
-👑 Pay ₦22,000 (Premium - 14 days + Auto Copier) ⭐
+💎 Pay ${trialEligible ? '₦4,000' : '₦5,000'} (Basic - 7 days) ${trialEligible ? '🔥 20% OFF!' : ''}
+📊 Pay ${trialEligible ? '₦8,000' : '₦10,000'} (Bi-Weekly - 14 days) ${trialEligible ? '🔥 20% OFF!' : ''}
+📅 Pay ${trialEligible ? '₦12,000' : '₦15,000'} (Monthly - 30 days) ${trialEligible ? '🔥 20% OFF!' : ''}
+👑 Pay ${trialEligible ? '₦17,600' : '₦22,000'} (Premium - 14 days + Auto Copier) ⭐ ${trialEligible ? '🔥 20% OFF!' : ''}
 
 Still have questions? Send /help`
 
@@ -634,25 +634,25 @@ Still have questions? Send /help`
         reply_markup: {
           inline_keyboard: [
             [
-              { text: '💎 Pay ₦5,000 (Basic)', url: basicData.authorizationUrl }
+              { text: `💎 Pay ${trialEligible ? '₦4,000 (was ₦5,000)' : '₦5,000'} - Basic`, url: basicData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Basic Payment', callback_data: 'verify_basic' }
             ],
             [
-              { text: '📊 Pay ₦10,000 (Bi-Weekly)', url: biweeklyData.authorizationUrl }
+              { text: `📊 Pay ${trialEligible ? '₦8,000 (was ₦10,000)' : '₦10,000'} - Bi-Weekly`, url: biweeklyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Bi-Weekly Payment', callback_data: 'verify_biweekly' }
             ],
             [
-              { text: '📅 Pay ₦15,000 (Monthly)', url: monthlyData.authorizationUrl }
+              { text: `📅 Pay ${trialEligible ? '₦12,000 (was ₦15,000)' : '₦15,000'} - Monthly`, url: monthlyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Monthly Payment', callback_data: 'verify_monthly' }
             ],
             [
-              { text: '👑 Pay ₦22,000 (Premium)', url: premiumData.authorizationUrl }
+              { text: `👑 Pay ${trialEligible ? '₦17,600 (was ₦22,000)' : '₦22,000'} - Premium ⭐`, url: premiumData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Premium Payment', callback_data: 'verify_premium' }
