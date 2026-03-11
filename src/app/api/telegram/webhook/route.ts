@@ -236,7 +236,9 @@ Start sharing your link on your status or with trader friends now!`)
     return
   }
 
-  const pendingCount = referrals.filter((r: any) => r.rewardStatus === 'pending').length
+  const totalClicks = referrals.length
+  const confirmedJoins = referrals.filter((r: any) => r.hasJoined).length
+  const pendingPayment = referrals.filter((r: any) => r.hasJoined && r.rewardStatus === 'pending').length
   const rewardedCount = referrals.filter((r: any) => r.rewardStatus === 'rewarded').length
 
   // Get milestone info
@@ -245,18 +247,22 @@ Start sharing your link on your status or with trader friends now!`)
     orderBy: { createdAt: 'desc' }
   })
   const countedSoFar = lastMilestone?.totalReferrals ?? 0
-  const referralsSinceLastMilestone = referrals.length - countedSoFar
-  const progressTo20 = Math.min(referralsSinceLastMilestone, 20)
+  
+  // Progress only counts users who have JOINED the channel
+  const referralsSinceLastMilestone = confirmedJoins - countedSoFar
+  const progressTo20 = Math.min(Math.max(0, referralsSinceLastMilestone), 20)
 
   let message = `🎁 <b>Your Referrals</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
 📊 <b>Stats:</b>
-• Total Friends Joined (Clicks): <b>${referrals.length}</b>
-• Waitlist (Haven't Paid): <b>${pendingCount}</b>
-• Completed (Paid - You got a match!): <b>${rewardedCount}</b>
-• <b>Clicks until FREE 7-Day Plan: ${progressTo20}/20</b>
+• Total Clicks: <b>${totalClicks}</b>
+• <b>Friends Joined: ${confirmedJoins} ✅</b>
+• Pending Payment: <b>${pendingPayment}</b> ⏳
+• Rewards Earned: <b>${rewardedCount}</b> 💎
+• <b>Progress to FREE 7-Day Plan: ${progressTo20}/20</b>
+<i>(Must join channel to count!)</i>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -4118,6 +4124,18 @@ Or send /cancel to exit.`
           // Also send a permanent message so they don't miss it
           await sendMessage(from.id, `❌ <b>You haven't joined yet!</b>\n\nYou must join <b>@${GENERAL_CHANNEL_ID.replace('@', '')}</b> before you can use the bot.\n\nAfter joining, click the button again! 👇`)
         }
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'referral') {
+        await handleReferral(from)
+        await answerCallbackQuery(id)
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'myrefs') {
+        await handleMyRefs(from)
+        await answerCallbackQuery(id)
         return NextResponse.json({ ok: true })
       }
 
