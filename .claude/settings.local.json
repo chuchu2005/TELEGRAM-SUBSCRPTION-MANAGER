@@ -13,7 +13,8 @@
       "Bash(powershell:*)",
       "Bash(node:*)",
       "Bash(Set-Content 'C:\\Users\\DALLAS COMPUTERS\\Desktop\\vipbot\\src\\lib\\conversation-state.ts' \")",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "Bash(tree:*)"
     ]
   }
 }

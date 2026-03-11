@@ -24,6 +24,9 @@ const pendingEmailUsers = new Set<string>()
 // Store users waiting for promo email input
 const pendingPromoEmailUsers = new Set<string>()
 
+// Store users waiting for copier 24hr promo email input
+const pendingCopierPromoEmailUsers = new Set<string>()
+
 // Store users waiting to verify payment (userId -> planType)
 const pendingVerificationUsers = new Map<string, PlanType>()
 
@@ -756,6 +759,108 @@ async function showPromoPaymentButton(user: TelegramUser, email: string): Promis
 
   } catch (error) {
     console.error('Error showing promo payment button:', error)
+    await sendMessage(user.id, '❌ Error generating payment links. Please try again later.')
+  }
+}
+
+/**
+ * Handle copier 24hr promo pay command - Collect email, then show payment options
+ */
+async function handleCopierPromoPay(user: TelegramUser): Promise<void> {
+  const telegramUserId = user.id.toString()
+  pendingCopierPromoEmailUsers.add(telegramUserId)
+  await sendMessage(user.id, `📧 <b>Step 1: Enter Your Email</b>
+
+Please provide your email address to continue with your Auto Copier promo.
+
+<b>Why do we need this?</b>
+✅ To send your official payment receipt
+✅ To help if there are any issues
+✅ To notify you before expiration
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Just type your email (e.g., john@email.com)</i>
+
+<i>Or send /cancel to exit</i>`)
+}
+
+/**
+ * Show copier 24hr promo payment button after collecting email
+ */
+async function showCopierPromoPaymentButton(user: TelegramUser, email: string): Promise<void> {
+  const telegramUserId = user.id.toString()
+  const telegramUsername = user.username || 'unknown'
+
+  pendingCopierPromoEmailUsers.delete(telegramUserId)
+
+  try {
+    const promoResponse = await fetch(`${APP_URL}/api/payment/link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: telegramUserId,
+        telegramUsername,
+        planType: 'copier24hr',
+        email
+      })
+    })
+
+    const promoData = await promoResponse.json()
+
+    if (!promoData.success) {
+      await sendMessage(user.id, '❌ Failed to generate promo payment link. Please try again later.')
+      return
+    }
+
+    const message = `✅ <b>Email Confirmed:</b> ${email}
+
+━━━━━━━━━━━━━━━━━━━
+
+🔥 <b>LIMITED TIME OFFER - 24 HOURS ONLY!</b>
+
+🎯 <b>Get the Auto Copier Bot for ₦15,000!</b>
+
+Regular Price: <s>₦22,000</s>
+<b>YOUR PRICE: ₦15,000</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>🚀 What You Get with Auto Copier:</b>
+
+✅ Trades copied <b>automatically</b> to your MT5
+✅ <b>Works 24/7</b> - even when your phone is OFF
+✅ <b>Instant execution</b> = better entry prices
+✅ <b>Full 14 days</b> of automated trading
+
+⏰ <b>Offer expires in 24 hours!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Tap below to pay securely:`
+
+    await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: user.id,
+        text: message,
+        parse_mode: 'HTML',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '🔥 Pay ₦15,000 Now (Auto Copier)', url: promoData.authorizationUrl }
+            ],
+            [
+              { text: '✅ Verify Copier Promo Payment', callback_data: 'verify_copier24hr' }
+            ]
+          ]
+        }
+      })
+    })
+
+  } catch (error) {
+    console.error('Error showing copier promo payment button:', error)
     await sendMessage(user.id, '❌ Error generating payment links. Please try again later.')
   }
 }
@@ -3537,7 +3642,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Answer the callback query to remove the loading state - use context-appropriate text
-      const isVerifyCallback = data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo' || data === 'verify_premium'
+      const isVerifyCallback = data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo' || data === 'verify_premium' || data === 'verify_copier24hr'
 
       await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
         method: 'POST',
@@ -3549,8 +3654,8 @@ export async function POST(request: NextRequest) {
       })
 
       // Handle verify payment button clicks
-      if (data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo' || data === 'verify_premium') {
-        const planType: PlanType = data === 'verify_basic' ? 'basic' : data === 'verify_biweekly' ? 'biweekly' : data === 'verify_monthly' ? 'monthly' : data === 'verify_promo' ? 'promo' : 'premium'
+      if (data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo' || data === 'verify_premium' || data === 'verify_copier24hr') {
+        const planType: PlanType = data === 'verify_basic' ? 'basic' : data === 'verify_biweekly' ? 'biweekly' : data === 'verify_monthly' ? 'monthly' : data === 'verify_promo' ? 'promo' : data === 'verify_copier24hr' ? 'copier24hr' : 'premium'
 
         // Mark user as waiting for reference
         pendingVerificationUsers.set(userId, planType)
@@ -3561,7 +3666,8 @@ export async function POST(request: NextRequest) {
           biweekly: 'Bi-Weekly (₦10,000)',
           monthly: 'Monthly (₦15,000)',
           promo: 'Promo (₦3,000)',
-          premium: 'Premium (₦22,000)'
+          premium: 'Premium (₦22,000)',
+          copier24hr: 'Copier 24Hr Promo (₦15,000)'
         }
         const planName = planNames[planType]
         const caption = `✅ <b>Verifying ${planName} Payment</b>
@@ -3607,6 +3713,11 @@ Or send /cancel to exit.`
 
       if (data === 'pay_promo' || data === 'promo') {
         await handlePromoPay(from)
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'promo_copier_24hr') {
+        await handleCopierPromoPay(from)
         return NextResponse.json({ ok: true })
       }
 
@@ -3755,6 +3866,19 @@ Or send /cancel to exit.`
       return NextResponse.json({ ok: true })
     }
 
+    // Check if user is waiting for copier 24hr promo email input
+    if (pendingCopierPromoEmailUsers.has(userId) && !command.startsWith('/')) {
+      const email = text!.trim()
+
+      if (!isValidEmail(email)) {
+        await sendMessage(from.id, `❌ <b>Invalid email format</b>\n\nPlease enter a valid email address.\n\n<i>Type your email again or send /cancel to exit</i>`)
+        return NextResponse.json({ ok: true })
+      }
+
+      await showCopierPromoPaymentButton(from, email)
+      return NextResponse.json({ ok: true })
+    }
+
     // Check if user is waiting for email input
     if (pendingEmailUsers.has(userId) && !command.startsWith('/')) {
       // User is providing their email
@@ -3821,6 +3945,12 @@ Please enter a valid email address.
       case '/cancel':
         if (pendingEmailUsers.has(userId)) {
           pendingEmailUsers.delete(userId)
+          await sendMessage(from.id, '✅ Cancelled. Send /pay when you\'re ready to get payment links.')
+        } else if (pendingPromoEmailUsers.has(userId)) {
+          pendingPromoEmailUsers.delete(userId)
+          await sendMessage(from.id, '✅ Cancelled. Send /pay when you\'re ready to get payment links.')
+        } else if (pendingCopierPromoEmailUsers.has(userId)) {
+          pendingCopierPromoEmailUsers.delete(userId)
           await sendMessage(from.id, '✅ Cancelled. Send /pay when you\'re ready to get payment links.')
         } else if (pendingVerificationUsers.has(userId)) {
           pendingVerificationUsers.delete(userId)

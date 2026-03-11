@@ -36,6 +36,12 @@ export const PLANS = {
     amountKobo: 0,  // FREE
     durationDays: 1,  // 24 hours
     hasCopierAccess: false
+  },
+  copier24hr: {
+    name: '24Hr Copier Promo',
+    amountKobo: 1500000,  // NGN 15,000 (special promo price)
+    durationDays: 14,
+    hasCopierAccess: true
   }
 } as const
 

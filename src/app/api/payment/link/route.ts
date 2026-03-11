@@ -43,8 +43,8 @@ export async function POST(request: NextRequest) {
     const planName = plan.name.charAt(0).toUpperCase() + plan.name.slice(1)
     let amountKobo: number = plan.amountKobo
 
-    // Check discount eligibility if it's a standard paid plan (not promo or trial)
-    if (planType !== 'trial' && planType !== 'promo' && TRIAL_DISCOUNT.enabled) {
+    // Check discount eligibility if it's a standard paid plan (not promo, trial, or special copier promo)
+    if (planType !== 'trial' && planType !== 'promo' && planType !== 'copier24hr' && TRIAL_DISCOUNT.enabled) {
       const now = new Date()
       const twentyFourHoursAgo = new Date(now.getTime() - (TRIAL_DISCOUNT.discountDurationHours * 60 * 60 * 1000))
 

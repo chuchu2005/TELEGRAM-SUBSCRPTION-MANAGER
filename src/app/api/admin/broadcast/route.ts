@@ -1,36 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendMessage } from '@/lib/telegram'
-
-const ADMIN_SECRET = process.env.ADMIN_SECRET!
+import { sendMessage, sendMessageWithKeyboard } from '@/lib/telegram'
+import { ADMIN_ID } from '@/lib/config'
 
 /**
  * POST /api/admin/broadcast
  * Send a marketing message to all users
- * Protected by ADMIN_SECRET in Authorization header
  */
 export async function POST(request: NextRequest) {
   try {
-    // Verify admin secret
-    const authHeader = request.headers.get('authorization')
-
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const token = authHeader.substring(7)
-
-    if (token !== ADMIN_SECRET) {
-      console.error('Invalid admin secret provided')
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-    }
 
     // Parse request body
     const body = await request.json()
-    const { message, planType, activeOnly } = body
+    const { message, planType, activeOnly, replyMarkup, testMode, testUserId } = body
 
     if (!message) {
       return NextResponse.json({ error: 'Message is required' }, { status: 400 })
+    }
+
+    // If test mode, send only to specified user or admin
+    if (testMode) {
+      const targetUserId = testUserId || ADMIN_ID
+      const sent = replyMarkup
+        ? await sendMessageWithKeyboard(targetUserId, message, replyMarkup)
+        : await sendMessage(targetUserId, message)
+
+      return NextResponse.json({
+        success: sent,
+        message: sent ? 'Test broadcast sent successfully' : 'Failed to send test message',
+        testUser: targetUserId
+      })
     }
 
     // Build query for recipients
@@ -66,7 +65,13 @@ export async function POST(request: NextRequest) {
 
     for (const subscription of subscriptions) {
       try {
-        const sent = await sendMessage(subscription.telegramUserId, message)
+        let sent: boolean
+        if (replyMarkup) {
+          sent = await sendMessageWithKeyboard(subscription.telegramUserId, message, replyMarkup)
+        } else {
+          sent = await sendMessage(subscription.telegramUserId, message)
+        }
+
         if (sent) {
           successCount++
         } else {
@@ -107,17 +112,6 @@ export async function POST(request: NextRequest) {
 
 // Allow GET for testing (will show usage info)
 export async function GET(request: NextRequest) {
-  const authHeader = request.headers.get('authorization')
-
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const token = authHeader.substring(7)
-
-  if (token !== ADMIN_SECRET) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-  }
 
   // Get subscriber stats
   const totalSubscribers = await prisma.subscription.groupBy({
@@ -148,27 +142,28 @@ export async function GET(request: NextRequest) {
     usage: {
       method: 'POST',
       headers: {
-        'Authorization': 'Bearer YOUR_ADMIN_SECRET'
+        'Content-Type': 'application/json'
       },
       body: {
         message: 'Your message here (supports HTML formatting)',
         planType: 'basic | monthly | premium | all (optional, default: all)',
-        activeOnly: 'true | false (optional, default: false)'
+        activeOnly: 'true | false (optional, default: false)',
+        replyMarkup: '{ inline_keyboard: [[{ text: "Button", url: "https://..." }]] } (optional)',
+        testMode: 'true | false (optional, default: false) - Send test message to admin only',
+        testUserId: 'number (optional, default: admin ID) - Send test message to specific user ID'
       },
       examples: [
         {
-          description: 'Send to all users',
+          description: 'Send test message to admin',
           curl: `curl -X POST https://your-domain.com/api/admin/broadcast \\
-  -H "Authorization: Bearer YOUR_ADMIN_SECRET" \\
   -H "Content-Type: application/json" \\
-  -d '{"message": "🎉 Special offer! 20% off all plans this week!"}'`
+  -d '{"message": "Test message", "testMode": true}'`
         },
         {
-          description: 'Send to active premium users only',
+          description: 'Send to all users',
           curl: `curl -X POST https://your-domain.com/api/admin/broadcast \\
-  -H "Authorization: Bearer YOUR_ADMIN_SECRET" \\
   -H "Content-Type: application/json" \\
-  -d '{"message": "Exclusive for Premium members!", "planType": "premium", "activeOnly": true}'`
+  -d '{"message": "🎉 Special offer! 20% off all plans this week!"}'`
         }
       ]
     },
