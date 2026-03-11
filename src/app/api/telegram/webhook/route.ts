@@ -1679,6 +1679,12 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
           data: { usageCount: customPromo.usageCount + 1 }
         })
 
+        // Unban user before creating invite link (in case they were previously banned)
+        if (!lastActiveSub) {
+          const unbanResult = await unbanChatMember(userId)
+          console.log(`[handleVerify - Promo] Unbanned user ${userId} before creating invite link. Result: ${unbanResult}`)
+        }
+
         let inviteLink = lastActiveSub?.inviteLinkUsed || await createInviteLink() || ''
 
         if (lastActiveSub) {
@@ -1749,6 +1755,12 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
           await prisma.mt5Setup.update({ where: { id: activeMt5.id }, data: { subscriptionId: newSubscription.id } })
           console.log(`Migrated MT5 setup ${activeMt5.id} to promo subscription ${newSubscription.id}`)
         }
+      }
+
+      // Unban user before creating invite link (in case they were previously banned)
+      if (!lastActiveSub) {
+        const unbanResult = await unbanChatMember(userId)
+        console.log(`[handleVerify - Hardcoded Promo] Unbanned user ${userId} before creating invite link. Result: ${unbanResult}`)
       }
 
       let inviteLink = lastActiveSub?.inviteLinkUsed || await createInviteLink() || ''
@@ -1867,6 +1879,10 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
     if (lastActiveSub) {
       await sendMessage(user.id, `✅ <b>Subscription Extended!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n💎 <b>Plan:</b> ${vPlanName}\n📅 <b>New Expiry:</b> ${formattedExpiry}\n\n━━━━━━━━━━━━━━━━━━━\n\nYou are already in the VIP channel!`)
     } else {
+      // Unban user before creating invite link (in case they were previously banned)
+      const unbanResult = await unbanChatMember(user.id)
+      console.log(`[${handleVerify.name}] Unbanned user ${user.id} before creating invite link. Result: ${unbanResult}`)
+
       const inviteLink = await createInviteLink()
       await sendMessage(user.id, `✅ <b>Payment Verified!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n💎 <b>Plan:</b> ${vPlanName}\n📅 <b>Expires:</b> ${formattedExpiry}\n\n━━━━━━━━━━━━━━━━━━━\n\n🔗 <b>Join Channel:</b>\n${inviteLink}`)
     }

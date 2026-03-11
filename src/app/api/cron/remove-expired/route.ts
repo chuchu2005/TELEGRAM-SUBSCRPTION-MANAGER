@@ -10,8 +10,11 @@ import { ADMIN_ID } from '@/lib/config'
  */
 export async function GET(request: NextRequest) {
   try {
+    console.log(`[Remove Expired Cron] Starting at ${new Date().toISOString()}`)
+
     // Find all expired subscriptions that haven't been removed yet
     const now = new Date()
+    console.log(`[Remove Expired Cron] Current time: ${now.toISOString()}`)
     const query: any = {
       where: {
         expiresAt: { lt: now },
@@ -21,10 +24,13 @@ export async function GET(request: NextRequest) {
     }
     const expiredSubscriptions: any[] = await prisma.subscription.findMany(query)
 
+    console.log(`[Remove Expired Cron] Found ${expiredSubscriptions.length} expired subscriptions to process`)
+
     let removedCount = 0
     let failedCount = 0
 
     for (const subscription of expiredSubscriptions) {
+      console.log(`[Remove Expired Cron] Processing subscription ${subscription.id} for user ${subscription.telegramUserId}, plan: ${subscription.planType}, expired: ${subscription.expiresAt.toISOString()}`)
       try {
         // Check if user has MT5 setup and delete from MetaCopier first
         if (subscription.mt5Setup && subscription.mt5Setup.metacopierAccountId) {
@@ -106,6 +112,8 @@ User has been removed from channel and MetaCopier.`)
           }
         })
 
+        console.log(`[Remove Expired Cron] User ${subscription.telegramUserId} has other active sub: ${!!hasOtherActiveSub}`)
+
         if (hasOtherActiveSub) {
           // Just mark this old subscription as removed
           await prisma.subscription.update({
@@ -133,18 +141,21 @@ User has been removed from channel and MetaCopier.`)
         }
 
         // Attempt to ban/remove user from channel
+        console.log(`[Remove Expired Cron] Attempting to ban user ${subscription.telegramUserId} from channel`)
         const banned = await banChatMember(subscription.telegramUserId)
+        console.log(`[Remove Expired Cron] Ban result for user ${subscription.telegramUserId}: ${banned}`)
+
+        // Always mark subscription as removed - even if ban fails (user may not be in channel)
+        // Update subscription as removed
+        await prisma.subscription.update({
+          where: { id: subscription.id },
+          data: {
+            isRemoved: true,
+            removedAt: now
+          }
+        })
 
         if (banned) {
-          // Update subscription as removed
-          await prisma.subscription.update({
-            where: { id: subscription.id },
-            data: {
-              isRemoved: true,
-              removedAt: now
-            }
-          })
-
           // Send notification to user (different message for trials vs paid plans)
           let expiryMessage = ''
 
@@ -237,15 +248,19 @@ Or type /pay to get started.`
           removedCount++
           console.log(`Removed user ${subscription.telegramUserId} (subscription ${subscription.id})`)
         } else {
+          // Ban failed (likely user not in channel), but we still marked subscription as removed
+          console.log(`[Remove Expired Cron] Ban failed for user ${subscription.telegramUserId} (user may not be in channel), but subscription marked as removed`)
           failedCount++
           console.error(`Failed to ban user ${subscription.telegramUserId}`)
         }
       } catch (error) {
         failedCount++
         console.error(`Error removing subscription ${subscription.id}:`, error)
-        // Don't mark as removed - will retry on next cron run
+        // Update already happened before this, just mark as failed for tracking
       }
     }
+
+    console.log(`[Remove Expired Cron] Summary: Processed=${expiredSubscriptions.length}, Removed=${removedCount}, Failed=${failedCount}`)
 
     return NextResponse.json({
       success: true,
