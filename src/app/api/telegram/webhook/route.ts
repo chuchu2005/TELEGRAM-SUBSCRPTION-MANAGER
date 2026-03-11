@@ -27,6 +27,9 @@ const pendingPromoEmailUsers = new Set<string>()
 // Store users waiting for copier 24hr promo email input
 const pendingCopierPromoEmailUsers = new Set<string>()
 
+// Track if copier promo broadcast is currently running
+let isCopierPromoBroadcastRunning = false
+
 // Store users waiting to verify payment (userId -> planType)
 const pendingVerificationUsers = new Map<string, PlanType>()
 
@@ -912,6 +915,14 @@ async function handleCopierPromoBroadcast(user: TelegramUser): Promise<void> {
     return
   }
 
+  // Prevent duplicate broadcasts
+  if (isCopierPromoBroadcastRunning) {
+    await sendMessage(user.id, '⚠️ Broadcast already running. Please wait for it to complete.')
+    return
+  }
+
+  isCopierPromoBroadcastRunning = true
+
   const message = `🔥 <b>LIMITED TIME OFFER - 24 HOURS ONLY!</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -1283,6 +1294,9 @@ ${message}
 ${failedUsers.length > 0 ? `❌ <b>Failed Users:</b>\n${failedUsers.slice(0, 10).join('\n')}${failedUsers.length > 10 ? `\n... and ${failedUsers.length - 10} more` : ''}` : ''}`
 
   await sendMessage(user.id, summary)
+
+  // Reset broadcast running flag
+  isCopierPromoBroadcastRunning = false
 }
 
 /**
