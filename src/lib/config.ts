@@ -3,19 +3,19 @@
 export const PLANS = {
   basic: {
     name: 'Basic VIP',
-    amountKobo: 500000,  // NGN 5,000
+    amountKobo: 1000000,  // NGN 10,000
     durationDays: 7,
     hasCopierAccess: false
   },
   biweekly: {
     name: 'Bi-Weekly VIP',
-    amountKobo: 1000000,  // NGN 10,000
+    amountKobo: 1700000,  // NGN 17,000
     durationDays: 14,
     hasCopierAccess: false
   },
   monthly: {
     name: 'Monthly VIP',
-    amountKobo: 1500000,  // NGN 15,000
+    amountKobo: 3500000,  // NGN 35,000
     durationDays: 30,
     hasCopierAccess: false
   },

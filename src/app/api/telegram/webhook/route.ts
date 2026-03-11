@@ -190,17 +190,17 @@ ${statsSection}
 
 Choose a plan to get instant access to our VIP community:
 
-💎 <b>Basic Plan</b> - ${trialEligible ? '₦4,000' : '₦5,000'} ${trialEligible ? '<s> (was ₦5,000)</s>' : ''}
+💎 <b>Basic Plan</b> - ${trialEligible ? '₦8,000' : '₦10,000'} ${trialEligible ? '<s> (was ₦10,000)</s>' : ''}
 ├─ <b>7 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Perfect for trying out
 
-📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦8,000' : '₦10,000'} ${trialEligible ? '<s> (was ₦10,000)</s>' : ''}
+📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦13,600' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Great balance of price & duration
 
-📅 <b>Monthly Plan</b> - ${trialEligible ? '₦12,000' : '₦15,000'} ${trialEligible ? '<s> (was ₦15,000)</s>' : ''}
+📅 <b>Monthly Plan</b> - ${trialEligible ? '₦28,000' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
 ├─ <b>30 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Best value for serious traders
@@ -275,9 +275,9 @@ Free trials are only available for new users.
 
 To get VIP signals, upgrade to a paid plan:
 
-💎 Basic: ₦5,000 (7 days)
-📊 Bi-Weekly: ₦10,000 (14 days)
-📅 Monthly: ₦15,000 (30 days)
+💎 Basic: ₦10,000 (7 days)
+📊 Bi-Weekly: ₦17,000 (14 days)
+📅 Monthly: ₦35,000 (30 days)
 👑 Premium: ₦22,000 (14 days + Copier)
 
 Tap below to get started!`
@@ -370,9 +370,9 @@ async function handleHelp(user: TelegramUser): Promise<void> {
 Send the command: /pay
 
 <b>Step 2: Choose Your Plan</b>
-💎 Basic (₦5,000) - 7 days, manual copying
-📊 Bi-Weekly (₦10,000) - 14 days, manual copying
-📅 Monthly (₦15,000) - 30 days, manual copying
+💎 Basic (₦10,000) - 7 days, manual copying
+📊 Bi-Weekly (₦17,000) - 14 days, manual copying
+📅 Monthly (₦35,000) - 30 days, manual copying
 👑 <b>Premium (₦22,000)</b> - 14 days + <b>AUTO COPIER BOT</b> ⭐
 
 ━━━━━━━━━━━━━━━━━━━
@@ -586,17 +586,17 @@ ${TRIAL_DISCOUNT.discountMessage}
 
 ` : ''}
 
-💎 <b>Basic Plan</b> - ${trialEligible ? '₦4,000' : '₦5,000'}
+💎 <b>Basic Plan</b> - ${trialEligible ? '₦8,000' : '₦10,000'}
 ├─ <b>7 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ For trying out
 
-📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦8,000' : '₦10,000'} ${trialEligible ? '<s> (was ₦10,000)</s>' : ''}
+📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦13,600' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Great balance of price & duration
 
-📅 <b>Monthly Plan</b> - ${trialEligible ? '₦12,000' : '₦15,000'} ${trialEligible ? '<s> (was ₦15,000)</s>' : ''}
+📅 <b>Monthly Plan</b> - ${trialEligible ? '₦28,000' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
 ├─ <b>30 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Best for consistent trading
@@ -638,9 +638,9 @@ Then send: /verify_basic REFERENCE
 
 Or send /pay to start over
 
-💎 Pay ${trialEligible ? '₦4,000' : '₦5,000'} (Basic - 7 days) ${trialEligible ? '🔥 20% OFF!' : ''}
-📊 Pay ${trialEligible ? '₦8,000' : '₦10,000'} (Bi-Weekly - 14 days) ${trialEligible ? '🔥 20% OFF!' : ''}
-📅 Pay ${trialEligible ? '₦12,000' : '₦15,000'} (Monthly - 30 days) ${trialEligible ? '🔥 20% OFF!' : ''}
+💎 Pay ${trialEligible ? '₦8,000' : '₦10,000'} (Basic - 7 days) ${trialEligible ? '🔥 20% OFF!' : ''}
+📊 Pay ${trialEligible ? '₦13,600' : '₦17,000'} (Bi-Weekly - 14 days) ${trialEligible ? '🔥 20% OFF!' : ''}
+📅 Pay ${trialEligible ? '₦28,000' : '₦35,000'} (Monthly - 30 days) ${trialEligible ? '🔥 20% OFF!' : ''}
 👑 Pay ${trialEligible ? '₦17,600' : '₦22,000'} (Premium - 14 days + Auto Copier) ⭐ ${trialEligible ? '🔥 20% OFF!' : ''}
 
 Still have questions? Send /help`
@@ -657,19 +657,19 @@ Still have questions? Send /help`
         reply_markup: {
           inline_keyboard: [
             [
-              { text: `💎 Pay ${trialEligible ? '₦4,000 (was ₦5,000)' : '₦5,000'} - Basic`, url: basicData.authorizationUrl }
+              { text: `💎 Pay ${trialEligible ? '₦8,000 (was ₦10,000)' : '₦10,000'} - Basic`, url: basicData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Basic Payment', callback_data: 'verify_basic' }
             ],
             [
-              { text: `📊 Pay ${trialEligible ? '₦8,000 (was ₦10,000)' : '₦10,000'} - Bi-Weekly`, url: biweeklyData.authorizationUrl }
+              { text: `📊 Pay ${trialEligible ? '₦13,600 (was ₦17,000)' : '₦17,000'} - Bi-Weekly`, url: biweeklyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Bi-Weekly Payment', callback_data: 'verify_biweekly' }
             ],
             [
-              { text: `📅 Pay ${trialEligible ? '₦12,000 (was ₦15,000)' : '₦15,000'} - Monthly`, url: monthlyData.authorizationUrl }
+              { text: `📅 Pay ${trialEligible ? '₦28,000 (was ₦35,000)' : '₦35,000'} - Monthly`, url: monthlyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Monthly Payment', callback_data: 'verify_monthly' }
@@ -3832,9 +3832,9 @@ export async function POST(request: NextRequest) {
 
         // Send photo with instructions
         const planNames = {
-          basic: 'Basic (₦5,000)',
-          biweekly: 'Bi-Weekly (₦10,000)',
-          monthly: 'Monthly (₦15,000)',
+          basic: 'Basic (₦10,000)',
+          biweekly: 'Bi-Weekly (₦17,000)',
+          monthly: 'Monthly (₦35,000)',
           promo: 'Promo (₦3,000)',
           premium: 'Premium (₦22,000)',
           copier24hr: 'Copier 24Hr Promo (₦15,000)'
@@ -4135,7 +4135,7 @@ Please enter a valid email address.
         if (!args[0]) {
           pendingVerificationUsers.set(userId, 'basic')
 
-          const caption = `✅ <b>Verifying Basic (₦5,000) Payment</b>
+          const caption = `✅ <b>Verifying Basic (₦10,000) Payment</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -4171,7 +4171,7 @@ Or send /cancel to exit.`
         if (!args[0]) {
           pendingVerificationUsers.set(userId, 'biweekly')
 
-          const caption = `✅ <b>Verifying Bi-Weekly (₦10,000) Payment</b>
+          const caption = `✅ <b>Verifying Bi-Weekly (₦17,000) Payment</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -4207,7 +4207,7 @@ Or send /cancel to exit.`
         if (!args[0]) {
           pendingVerificationUsers.set(userId, 'monthly')
 
-          const caption = `✅ <b>Verifying Monthly (₦15,000) Payment</b>
+          const caption = `✅ <b>Verifying Monthly (₦35,000) Payment</b>
 
 ━━━━━━━━━━━━━━━━━━━
 

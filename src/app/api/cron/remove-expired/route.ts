@@ -191,9 +191,9 @@ Because you just completed your trial, we're giving you a 20% discount on ALL pl
 
 ━━━━━━━━━━━━━━━━━━━
 
-💎 Basic: ₦4,000 <s>(was ₦5,000)</s> - 7 days
-📊 Bi-Weekly: ₦8,000 <s>(was ₦10,000)</s> - 14 days
-📅 Monthly: ₦12,000 <s>(was ₦15,000)</s> - 30 days
+💎 Basic: ₦8,000 <s>(was ₦10,000)</s> - 7 days
+📊 Bi-Weekly: ₦13,600 <s>(was ₦17,000)</s> - 14 days
+📅 Monthly: ₦28,000 <s>(was ₦35,000)</s> - 30 days
 👑 Premium: ₦17,600 <s>(was ₦22,000)</s> - 14 days + Copier
 
 ━━━━━━━━━━━━━━━━━━━
@@ -213,9 +213,9 @@ Your access to Pear VIP signals channel has been removed.
 <b>Want to renew?</b>
 Just tap the button below to make a new payment!
 
-💎 Basic: ₦5,000 (7 days)
-📊 Bi-Weekly: ₦10,000 (14 days)
-📅 Monthly: ₦15,000 (30 days)
+💎 Basic: ₦10,000 (7 days)
+📊 Bi-Weekly: ₦17,000 (14 days)
+📅 Monthly: ₦35,000 (30 days)
 👑 Premium: ₦22,000 (14 days + Copier)
 
 ━━━━━━━━━━━━━━━━━━━
