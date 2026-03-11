@@ -131,6 +131,48 @@ model User {
   telegramUserId   String   @unique
   telegramUsername String?
   telegramName     String?
+  hasJoinedChannel Boolean  @default(false)
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
+}
+
+model Referral {
+  id                  String    @id @default(auto()) @map("_id") @db.ObjectId
+  referrerId          String    // Telegram user ID of the person who referred
+  referredUserId      String?   // Telegram user ID of the person referred
+  referredUsername    String?
+  referredName        String?
+  hasJoined           Boolean   @default(false)
+
+  // Reward tracking
+  planType            String?   // Plan type the referred user paid for (e.g., 'basic', 'monthly')
+  rewardStatus        String    @default("pending") // "pending", "rewarded"
+  rewardGrantedAt     DateTime? // When the reward subscription was created
+
+  // 20-referral milestone tracking
+  countedTowardsReward Boolean  @default(true) // Can be excluded if user cancels/refunds
+
+  // Timing
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  @@index([referrerId])
+  @@index([referredUserId])
+  @@index([rewardStatus])
+  @@index([createdAt])
+}
+
+model ReferralReward {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  referrerId      String   // Who earned the reward
+  totalReferrals  Int      @default(0) // How many rewarded referrals triggered this
+  rewardPlanType  String   // "basic"
+  rewardExpiry    DateTime // When the free plan expires
+  isActive        Boolean  @default(true)
+
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([referrerId])
+  @@index([isActive])
 }

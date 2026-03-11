@@ -59,6 +59,8 @@ export const RATE_LIMIT = {
 }
 
 export const CHANNEL_NAME = 'Pear VIP signals channel'
+export const GENERAL_CHANNEL_ID = '@pearforexsignals'
+export const GENERAL_CHANNEL_NAME = 'Pear Forex Signals'
 
 // Admin Telegram User ID (only this user can use /broadcast)
 export const ADMIN_ID = 5472144783

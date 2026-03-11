@@ -304,9 +304,10 @@ export async function unbanChatMember(userId: string | number): Promise<boolean>
 /**
  * Get member status from channel
  */
-export async function getChatMember(userId: string | number): Promise<ChatMemberResponse> {
+export async function getChatMember(userId: string | number, chatId?: string | number): Promise<ChatMemberResponse> {
   try {
-    const response = await fetch(`${TELEGRAM_API_BASE}/getChatMember?chat_id=${CHANNEL_ID}&user_id=${userId}`)
+    const targetChatId = chatId || CHANNEL_ID
+    const response = await fetch(`${TELEGRAM_API_BASE}/getChatMember?chat_id=${targetChatId}&user_id=${userId}`)
     return await response.json()
   } catch (error) {
     console.error('Error getting chat member:', error)

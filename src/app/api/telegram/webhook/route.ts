@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText } from '@/lib/telegram'
+import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText, getChatMember } from '@/lib/telegram'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
-import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID, TRADE_STATS_CONFIG, TRIAL_DISCOUNT } from '@/lib/config'
+import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID, TRADE_STATS_CONFIG, TRIAL_DISCOUNT, GENERAL_CHANNEL_ID, GENERAL_CHANNEL_NAME } from '@/lib/config'
 import { createMt5Account, updateCopierSettings, removeUserMt5Account } from '@/lib/metacopier'
 import { encryptPassword, decryptPassword } from '@/lib/encryption'
 import { setConversationState, getConversationState, clearConversationState, advanceMt5SetupStep, advancePromoStep, updateConversationData, Mt5SetupStep } from '@/lib/conversation-state'
 import { settingsKeyboard, confirmSetupKeyboard, lotSizeKeyboard, maxLotKeyboard, maxLotTotalKeyboard, maxPositionsKeyboard } from '@/lib/telegram-keyboards'
 import { generateTradeStatistics, formatStatsMessage } from '@/lib/trade-stats'
+import { checkAndAwardReferralMilestone } from '@/lib/referral'
 import type { TelegramUpdate, TelegramUser } from '@/lib/telegram'
 
 // Telegram file_id for reference.jpg image
@@ -117,8 +118,162 @@ function getRemainingAttempts(userId: string): number {
 /**
  * Reset rate limit for a user (call on successful verification)
  */
+/**
+ * Check if user is in the required channel
+ */
+async function ensureJoinedChannel(userId: string | number): Promise<boolean> {
+  try {
+    const user = await prisma.user.findUnique({
+      where: { telegramUserId: userId.toString() }
+    })
+
+    if (user?.hasJoinedChannel) {
+      console.log(`[ChannelCheck] User ${userId} already verified in DB`)
+      return true
+    }
+
+    const response = await getChatMember(userId, GENERAL_CHANNEL_ID)
+    console.log(`[ChannelCheck] Telegram response for ${userId} in ${GENERAL_CHANNEL_ID}:`, JSON.stringify(response))
+    
+    if (response.ok && ['member', 'administrator', 'creator'].includes(response.result?.status || '')) {
+      console.log(`[ChannelCheck] User ${userId} verified as ${response.result?.status}`)
+      await prisma.user.update({
+        where: { telegramUserId: userId.toString() },
+        data: { hasJoinedChannel: true }
+      })
+      return true
+    }
+    
+    console.log(`[ChannelCheck] User ${userId} not a member. Status: ${response.result?.status || 'unknown'}`)
+    return false
+  } catch (err) {
+    console.error('[ChannelCheck] Error in ensureJoinedChannel:', err)
+    return false // Be strict - don't allow access if check fails
+  }
+}
+
+/**
+ * Send the "Join Channel" requirement message
+ */
+async function sendJoinRequest(userId: string | number): Promise<void> {
+  const message = `👋 <b>Welcome!</b>\n\nTo use this bot, you must be a member of our main channel first.\n\n👇 <b>Join here:</b>\n@${GENERAL_CHANNEL_ID.replace('@', '')}\n\n<i>After joining, click the button below!</i>`
+  
+  await sendMessageWithKeyboard(userId, message, {
+    inline_keyboard: [
+      [{ text: '📢 Join Channel', url: `https://t.me/${GENERAL_CHANNEL_ID.replace('@', '')}` }],
+      [{ text: '✅ I Have Joined', callback_data: 'check_joined' }]
+    ]
+  })
+}
+
 function resetRateLimit(userId: string): void {
   rateLimitStore.delete(userId.toString())
+}
+
+const BOT_USERNAME = 'pearvipbot'
+
+/**
+ * Handle /referral command — show user's referral code and shareable link
+ */
+async function handleReferral(user: TelegramUser): Promise<void> {
+  const userId = user.id.toString()
+  const referralCode = `ref_${userId}`
+  const referralLink = `https://t.me/${BOT_USERNAME}?start=${referralCode}`
+
+  await sendMessage(user.id, `🎁 <b>Unlock FREE VIP Access!</b> 🚀
+
+━━━━━━━━━━━━━━━━━━━
+
+Your exclusive referral code: <b>${referralCode}</b>
+
+<b>Share this link with your friends:</b>
+👉 ${referralLink}
+
+<b>💸 How to Earn Free Subscriptions:</b>
+
+<b>1. Direct Plan Match 💎</b>
+When someone joins using your link and pays for <b>ANY</b> plan, you instantly get the <b>EXACT SAME PLAN</b> added to your account for <b>FREE!</b>
+<i>Example: Your friend buys a ₦35,000 Monthly plan. BOOM! You instantly get 30 days of VIP Access completely free!</i>
+
+<b>2. The 20-Referral Milestone 🏆</b>
+Every 20 successful referrals you bring in, we will automatically reward you with a <b>FREE 7-Day Basic Plan</b> on top of your existing rewards!
+
+There is <b>NO LIMIT</b> on how many free plans you can earn. Share in groups, statuses, or with friends and let our bot make you a VIP for life!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>📊 Track Your Earnings:</b>
+Use /myrefs anytime to check your stats, track your friends, and see how close you are to your next free plan.`)
+}
+
+/**
+ * Handle /myrefs command — show referral stats
+ */
+async function handleMyRefs(user: TelegramUser): Promise<void> {
+  const userId = user.id.toString()
+
+  const referrals = await prisma.referral.findMany({
+    where: { referrerId: userId },
+    orderBy: { createdAt: 'desc' }
+  })
+
+  if (referrals.length === 0) {
+    await sendMessage(user.id, `🎁 <b>Your Referral Dashboard</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+You haven't referred anyone yet! 😔
+
+Use /referral to get your unique sharing link.
+
+<b>💸 The Rules of Earning:</b>
+1️⃣ <b>Direct Match:</b> Your friend buys a plan? You get the exact same plan for FREE instantly!
+<i>(If they buy Monthly, you get Monthly free!)</i>
+
+2️⃣ <b>Milestone Bonus:</b> Reach 20 successful referrals and unlock a bonus <b>FREE 7-Day Plan!</b> 🏆
+
+Start sharing your link on your status or with trader friends now!`)
+    return
+  }
+
+  const pendingCount = referrals.filter((r: any) => r.rewardStatus === 'pending').length
+  const rewardedCount = referrals.filter((r: any) => r.rewardStatus === 'rewarded').length
+
+  // Get milestone info
+  const lastMilestone = await prisma.referralReward.findFirst({
+    where: { referrerId: userId },
+    orderBy: { createdAt: 'desc' }
+  })
+  const countedSoFar = lastMilestone?.totalReferrals ?? 0
+  const referralsSinceLastMilestone = referrals.length - countedSoFar
+  const progressTo20 = Math.min(referralsSinceLastMilestone, 20)
+
+  let message = `🎁 <b>Your Referrals</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+📊 <b>Stats:</b>
+• Total Friends Joined (Clicks): <b>${referrals.length}</b>
+• Waitlist (Haven't Paid): <b>${pendingCount}</b>
+• Completed (Paid - You got a match!): <b>${rewardedCount}</b>
+• <b>Clicks until FREE 7-Day Plan: ${progressTo20}/20</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>📋 Recent Referrals:</b>`
+
+  const recent = referrals.slice(0, 10)
+  for (const ref of recent) {
+    const statusEmoji = ref.rewardStatus === 'rewarded' ? '✅' : '⏳'
+    const planInfo = ref.planType ? ` (${ref.planType})` : ''
+    const name = ref.referredName || ref.referredUsername || 'User'
+    const status = ref.rewardStatus === 'rewarded' ? 'PAID' : 'Waiting'
+    message += `\n${statusEmoji} ${name}${planInfo} — ${status}`
+  }
+
+  message += `\n\n━━━━━━━━━━━━━━━━━━━\n\n<i>Share more to earn free access!</i>\n\nUse /referral to get your sharing link.`
+
+  await sendMessage(user.id, message)
 }
 
 /**
@@ -404,6 +559,16 @@ Send the command: /pay
 • Or: /verify_monthly YOUR_REFERENCE
 • Or: /verify_premium YOUR_REFERENCE
 • Bot verifies instantly → sends invite link
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>🎁 Earn Free Plans — Referral Program</b>
+
+• /referral — Get your unique referral link to share
+• /myrefs — View your referral stats & earnings
+
+Share your link → friend pays → <b>you get the same plan FREE!</b>
+20 referrals = <b>FREE Basic Plan (7 days)</b> 🏆
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -3814,14 +3979,14 @@ export async function POST(request: NextRequest) {
       // Answer the callback query to remove the loading state - use context-appropriate text
       const isVerifyCallback = data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo' || data === 'verify_premium' || data === 'verify_copier24hr'
 
-      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/answerCallbackQuery`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          callback_query_id: id,
-          ...(isVerifyCallback ? { text: '✅ Please send your transaction reference' } : {})
-        })
-      })
+      const isCheckJoined = data === 'check_joined'
+
+      // Only answer early if it's NOT a check_joined or verify callback (which we handle specially)
+      if (!isVerifyCallback && !isCheckJoined) {
+        await answerCallbackQuery(id)
+      } else if (isVerifyCallback) {
+        await answerCallbackQuery(id, '✅ Please send your transaction reference')
+      }
 
       // Handle verify payment button clicks
       if (data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo' || data === 'verify_premium' || data === 'verify_copier24hr') {
@@ -3901,6 +4066,47 @@ Or send /cancel to exit.`
         return NextResponse.json({ ok: true })
       }
 
+      if (data === 'check_joined') {
+        const userId = from.id.toString()
+        const hasJoined = await ensureJoinedChannel(from.id)
+        if (hasJoined) {
+          // Send a brief success alert
+          await answerCallbackQuery(id, '✅ Thank you! Access granted.')
+          
+          // Check if this user was referred and hasn't had their referral "count" yet
+          const pendingReferral = await prisma.referral.findFirst({
+            where: { referredUserId: userId, hasJoined: false }
+          })
+
+          if (pendingReferral) {
+            const referrerId = pendingReferral.referrerId
+            await prisma.referral.update({
+              where: { id: pendingReferral.id },
+              data: { hasJoined: true }
+            })
+
+            // NOW notify the referrer
+            try {
+              await sendMessage(Number(referrerId), `🎉 <b>WOOHOO! A FRIEND JOINED!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n${from.username ? '@' + from.username : from.first_name} just joined the channel using your link!\n\nThat gets you <b>1 step closer</b> to your 20-click FREE VIP week! 🏃‍♂️💨\n\nKeep sharing! Use /myrefs to see your total.`)
+              
+              // And check for the milestone
+              await checkAndAwardReferralMilestone(referrerId)
+            } catch (err) {
+              console.error('[Referral] Failed to notify referrer after join:', err)
+            }
+          }
+
+          // And then show the main menu
+          await handleStart(from)
+        } else {
+          // Send a pop-up alert
+          await answerCallbackQuery(id, `❌ Access Denied!`, true)
+          // Also send a permanent message so they don't miss it
+          await sendMessage(from.id, `❌ <b>You haven't joined yet!</b>\n\nYou must join <b>@${GENERAL_CHANNEL_ID.replace('@', '')}</b> before you can use the bot.\n\nAfter joining, click the button again! 👇`)
+        }
+        return NextResponse.json({ ok: true })
+      }
+
       return NextResponse.json({ ok: true })
     }
 
@@ -3918,11 +4124,77 @@ Or send /cancel to exit.`
 
     const userId = from.id.toString()
 
+    // Enforce channel join requirement (bypass for /broadcast or admin commands if needed, 
+    // but usually standard for all users)
+    const hasJoined = await ensureJoinedChannel(from.id)
+    if (!hasJoined && command !== '/start') {
+      await sendJoinRequest(from.id)
+      return NextResponse.json({ ok: true })
+    }
+
     // Handle Deep Linking (start parameter)
     // Telegram sends t.me/bot?start=payload as "/start payload"
     if (command === '/start' && args.length > 0) {
       const payload = args[0]
       console.log(`[DeepLink] Received payload: ${payload}`)
+
+      // Handle referral deep links (MUST come before the generic _ splitter)
+      if (payload.startsWith('ref_')) {
+        const referrerId = payload.slice(4) // strip 'ref_'
+        console.log(`[Referral] User ${userId} joined via referral from ${referrerId}`)
+
+        // Don't self-refer
+        if (referrerId === userId) {
+          console.log(`[Referral] User ${userId} tried to self-refer, ignoring`)
+          if (!hasJoined) {
+            await sendJoinRequest(from.id)
+          } else {
+            await handleStart(from)
+          }
+          return NextResponse.json({ ok: true })
+        }
+
+        // Check if this user was already referred (avoid duplicate entries)
+        const existingReferral = await prisma.referral.findFirst({
+          where: { referredUserId: userId }
+        })
+
+        if (!existingReferral) {
+          // Check if user is ALREADY joined
+          const userHasJoined = await ensureJoinedChannel(from.id)
+
+          await prisma.referral.create({
+            data: {
+              referrerId,
+              referredUserId: userId,
+              referredUsername: from.username || null,
+              referredName: from.first_name || null,
+              rewardStatus: 'pending',
+              hasJoined: userHasJoined // Immediately true if they are already in the channel
+            }
+          })
+
+          // If they were ALREADY members, notify referrer immediately
+          if (userHasJoined) {
+            try {
+              await sendMessage(Number(referrerId), `🎉 <b>WOOHOO! A FRIEND JOINED!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n${from.username ? '@' + from.username : from.first_name} just joined using your link!\n\nThat gets you <b>1 step closer</b> to your 20-click FREE VIP week! 🏃‍♂️💨\n\nKeep sharing! Use /myrefs to see your total.`)
+              await checkAndAwardReferralMilestone(referrerId)
+            } catch (err) {
+              console.error('[Referral] Failed to notify referrer for existing member:', err)
+            }
+          }
+        } else {
+          console.log(`[Referral] User ${userId} already has a referral record, skipping duplicate`)
+        }
+
+        // Show normal start message to referred user (if they joined)
+        if (!hasJoined) {
+          await sendJoinRequest(from.id)
+        } else {
+          await handleStart(from)
+        }
+        return NextResponse.json({ ok: true })
+      }
 
       // Handle clean command mapping (e.g., promo_VIP -> /promo VIP)
       if (payload.includes('_')) {
@@ -3977,7 +4249,11 @@ Or send /cancel to exit.`
                 // If not specifically handled here, let it fall through to normal switch
                 // with the new command/args if we were to modify them.
                 // For safety, we just call handleStart if no specific mapping
-                await handleStart(from)
+                if (!hasJoined) {
+                  await sendJoinRequest(from.id)
+                } else {
+                  await handleStart(from)
+                }
             }
           })()
           return NextResponse.json({ ok: true })
@@ -4097,7 +4373,13 @@ Please enter a valid email address.
     // Handle commands
     switch (command) {
       case '/start':
-        await handleStart(from)
+        // If it's a deep link, we handled it above.
+        // If it's a normal /start, check join status.
+        if (!hasJoined) {
+          await sendJoinRequest(from.id)
+        } else {
+          await handleStart(from)
+        }
         break
 
       case '/help':
@@ -4361,6 +4643,14 @@ Or send /cancel to exit.`
         await handleDeletePromo(from, args)
         break
 
+      case '/referral':
+        await handleReferral(from)
+        break
+
+      case '/myrefs':
+        await handleMyRefs(from)
+        break
+
       case '/status':
         await handleStatus(from)
         break
@@ -4388,6 +4678,14 @@ You can start MT5 setup anytime by typing /mt5setup`)
         } else {
           await sendMessage(from.id, `Nothing to skip. Type /help to see available commands.`)
         }
+        break
+
+      case '/reset_me':
+        await prisma.user.update({
+          where: { telegramUserId: userId },
+          data: { hasJoinedChannel: false }
+        })
+        await sendMessage(from.id, "🔄 <b>Debug Reset:</b> Your channel join status has been reset to FALSE. Please try /start again to test the join requirement.")
         break
 
       case '/remove_copier':

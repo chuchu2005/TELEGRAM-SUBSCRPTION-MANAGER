@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, createInviteLink, unbanChatMember, formatDate } from '@/lib/telegram'
 import { calculateExpiryDate, PLANS, PlanType } from '@/lib/config'
+import { checkAndAwardReferralMilestone } from '@/lib/referral'
 
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY!
 
@@ -41,6 +42,95 @@ interface PaystackWebhookEvent {
     paid_at: string
   }
 }
+
+// ─────────────────────────────────────────────────────────────
+// Referral reward helpers
+// ─────────────────────────────────────────────────────────────
+
+/**
+ * Process referral reward when a referred user completes a payment.
+ * Finds a pending referral for telegramId, awards the referrer the same plan for free.
+ */
+async function processReferralReward(
+  telegramId: string,
+  planType: PlanType,
+  paystackRef: string
+): Promise<void> {
+  try {
+    // Find pending referral where this user was referred
+    const referral = await prisma.referral.findFirst({
+      where: {
+        referredUserId: telegramId,
+        rewardStatus: 'pending',
+        countedTowardsReward: true
+      }
+    })
+
+    if (!referral) {
+      return // This user wasn't referred by anyone
+    }
+
+    console.log(`[Referral Reward] Processing reward for referrer ${referral.referrerId}`)
+
+    const plan = PLANS[planType]
+    const rewardExpiry = calculateExpiryDate(planType)
+
+    // Unban + create invite link for referrer
+    await unbanChatMember(referral.referrerId)
+    const rewardInviteLink = await createInviteLink()
+
+    // Create free reward subscription for referrer
+    await prisma.subscription.create({
+      data: {
+        telegramUserId: referral.referrerId,
+        paystackRef: `REF_REWARD_${paystackRef}`,
+        amountKobo: 0,
+        planType,
+        hasCopierAccess: plan.hasCopierAccess,
+        startedAt: new Date(),
+        expiresAt: rewardExpiry,
+        inviteLinkUsed: rewardInviteLink ?? undefined
+      }
+    })
+
+    // Mark referral as rewarded
+    await prisma.referral.update({
+      where: { id: referral.id },
+      data: {
+        rewardStatus: 'rewarded',
+        rewardGrantedAt: new Date(),
+        planType
+      }
+    })
+
+    // Send reward notification to referrer
+    const rewardLinkLine = rewardInviteLink
+      ? `\n\nYour invite link:\n👉 ${rewardInviteLink}`
+      : ''
+
+    await sendMessage(referral.referrerId, `🎁 <b>FREE REWARD!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Your referral just paid — you've earned a reward!
+
+💎 <b>Plan: ${plan.name}</b>
+📅 Expires: ${formatDate(rewardExpiry)}${rewardLinkLine}
+
+━━━━━━━━━━━━━━━━━━━
+
+Tap /myrefs to see all your referrals.`)
+
+    console.log(`[Referral Reward] Awarded ${plan.name} to referrer ${referral.referrerId}`)
+
+    // Check if referrer hit the 20-referral milestone
+    await checkAndAwardReferralMilestone(referral.referrerId)
+  } catch (error) {
+    console.error(`[Referral Reward] Error processing reward for telegramId ${telegramId}:`, error)
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 
 /**
  * POST handler for Paystack webhook
@@ -178,6 +268,9 @@ Type /status anytime to check your subscription.`
 
       await sendMessage(telegramId, message)
       console.log(`Invite link sent to telegram user ${telegramId}`)
+
+      // Process referral reward (non-blocking — errors are caught internally)
+      await processReferralReward(telegramId, planType, data.reference)
 
       return NextResponse.json({
         success: true,
