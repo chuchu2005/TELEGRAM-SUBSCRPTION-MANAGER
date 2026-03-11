@@ -1557,7 +1557,7 @@ async function handleBotStats(user: TelegramUser): Promise<void> {
 • Total Clicks: <b>${totalReferrals}</b>
 • Confirmed Joins: <b>${joinedReferrals}</b>
 • Unique Referrers: <b>${uniqueReferrers.length}</b>
-• Miletones Rewarded: <b>${totalMilestones}</b>
+• Milestones Rewarded: <b>${totalMilestones}</b>
 • Direct Plan Matches: <b>${rewardedReferrals}</b>
 
 💰 <b>Financials:</b>
