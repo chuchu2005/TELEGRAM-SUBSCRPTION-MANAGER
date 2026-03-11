@@ -1496,7 +1496,14 @@ async function handleBotStats(user: TelegramUser): Promise<void> {
     // 4. Premium users with MT5 Setup
     const premiumWithSetup = await prisma.mt5Setup.count()
 
-    // 5. Total Revenue (NGN)
+    // 5. Referral Statistics
+    const totalReferrals = await prisma.referral.count()
+    const joinedReferrals = await prisma.referral.count({ where: { hasJoined: true } })
+    const rewardedReferrals = await prisma.referral.count({ where: { rewardStatus: 'rewarded' } })
+    const uniqueReferrers = await prisma.referral.groupBy({ by: ['referrerId'] })
+    const totalMilestones = await prisma.referralReward.count()
+
+    // 6. Total Revenue (NGN)
     const totalRevenue = await prisma.subscription.aggregate({
       _sum: {
         amountKobo: true
@@ -1548,6 +1555,13 @@ async function handleBotStats(user: TelegramUser): Promise<void> {
 💎 <b>Subscriptions:</b>
 • Active VIP Members: <b>${activeSubscribers}</b>
 • Active MT5 Copiers: <b>${premiumWithSetup}</b>
+
+🎁 <b>Referrals:</b>
+• Total Clicks: <b>${totalReferrals}</b>
+• Confirmed Joins: <b>${joinedReferrals}</b>
+• Unique Referrers: <b>${uniqueReferrers.length}</b>
+• Miletones Rewarded: <b>${totalMilestones}</b>
+• Direct Plan Matches: <b>${rewardedReferrals}</b>
 
 💰 <b>Financials:</b>
 • Total Revenue: <b>₦${revenueNaira.toLocaleString()}</b>${subsList}

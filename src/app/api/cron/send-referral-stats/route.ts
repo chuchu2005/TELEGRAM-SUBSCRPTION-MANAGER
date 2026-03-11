@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, formatDate } from '@/lib/telegram'
+import { ADMIN_ID } from '@/lib/config'
 
 /**
  * GET handler for daily referral stats cron job
@@ -77,6 +78,33 @@ export async function GET(request: NextRequest) {
       } catch (err) {
         console.error(`[Referral Stats Cron] Error sending to ${referrerId}:`, err)
       }
+    }
+
+    // Send a global summary to the Admin
+    try {
+      const today = new Date().toLocaleDateString()
+      const globalClicks = await prisma.referral.count()
+      const globalJoins = await prisma.referral.count({ where: { hasJoined: true } })
+      const globalRewards = await prisma.referralReward.count()
+
+      const adminSummary = `📢 <b>Global Referral Daily Summary</b>
+      
+━━━━━━━━━━━━━━━━━━━
+
+📅 <b>Date:</b> ${today}
+
+📊 <b>Activity:</b>
+• Stats sent to: <b>${statsSent}</b> referrers
+• Total Clicks (All Time): <b>${globalClicks}</b>
+• Verified Joins (All Time): <b>${globalJoins}</b>
+• Milestones Awarded: <b>${globalRewards}</b>
+
+━━━━━━━━━━━━━━━━━━━
+<i>This message is sent automatically to the admin.</i>`
+
+      await sendMessage(ADMIN_ID, adminSummary)
+    } catch (adminErr) {
+      console.error('[Referral Stats Cron] Failed to notify admin:', adminErr)
     }
 
     return NextResponse.json({
