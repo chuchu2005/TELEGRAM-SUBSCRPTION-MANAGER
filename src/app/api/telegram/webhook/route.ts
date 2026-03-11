@@ -28,8 +28,8 @@ const pendingPromoEmailUsers = new Set<string>()
 // Store users waiting for copier 24hr promo email input
 const pendingCopierPromoEmailUsers = new Set<string>()
 
-// Track if copier promo broadcast is currently running
-let isCopierPromoBroadcastRunning = false
+// Track if a broadcast is currently running (to prevent Telegram retries from starting multiple loops)
+let isGlobalBroadcastRunning = false
 
 // Store users waiting to verify payment (userId -> planType)
 const pendingVerificationUsers = new Map<string, PlanType>()
@@ -1087,12 +1087,12 @@ async function handleCopierPromoBroadcast(user: TelegramUser): Promise<void> {
   }
 
   // Prevent duplicate broadcasts
-  if (isCopierPromoBroadcastRunning) {
+  if (isGlobalBroadcastRunning) {
     await sendMessage(user.id, '⚠️ Broadcast already running. Please wait for it to complete.')
     return
   }
 
-  isCopierPromoBroadcastRunning = true
+  isGlobalBroadcastRunning = true
 
   const message = `🔥 <b>LIMITED TIME OFFER - 24 HOURS ONLY!</b>
 
@@ -1345,129 +1345,95 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
     return
   }
 
+  // Prevent duplicate broadcasts (crucial to stop Telegram retry loops)
+  if (isGlobalBroadcastRunning) {
+    await sendMessage(user.id, '⚠️ <b>Wait!</b> A broadcast is already running. Please wait for it to finish before starting a new one.')
+    return
+  }
+
   // Get message from args
   const message = args.join(' ')
 
   if (!message.trim()) {
-    await sendMessage(user.id, `❌ Please provide a message to broadcast.
-
-<b>Usage:</b>
-/broadcast Your message here
-/broadcast Message | Button Text | callback_data
-
-<b>Examples:</b>
-/broadcast 🎉 Special offer this week!
-/broadcast 🔥 PROMO: ₦3,000 for 7 days! | 🔥 Get Promo | pay_promo
-
-<b>Available commands:</b>
-/broadcast - Send to everyone
-/broadcast_active - Send to active subscribers only
-/broadcast_premium - Send to premium users only`)
+    await sendMessage(user.id, `❌ Please provide a message to broadcast.\n\n<b>Usage:</b>\n/broadcast Your message here`)
     return
   }
 
-  // Send acknowledgment
+  // Support for optional button: "Line 1 | Line 2 | Button Text | callback_data"
+  const messageParts = message.split('|').map(p => p.trim())
+  let cleanMessage = ''
+  let buttonText = ''
+  let callbackData = ''
+
+  if (messageParts.length >= 3) {
+    callbackData = messageParts.pop()!
+    buttonText = messageParts.pop()!
+    cleanMessage = messageParts.join('\n')
+  } else {
+    cleanMessage = message.split('|').map(p => p.trim()).join('\n')
+  }
+
+  // 1. Acknowledge the command immediately
   const targetType = planType === 'all' ? 'all users' : `${planType} users`
   const filterType = activeOnly ? 'active subscribers only' : targetType
 
-  await sendMessage(user.id, `📢 <b>Broadcasting message...</b>
+  await sendMessage(user.id, `📢 <b>Starting Broadcast...</b>\n\n━━━━━━━━━━━━━━━━━━━\n\nTarget: ${filterType}\n\n<i>Processing in background. I will send you a summary when done!</i>`)
 
-━━━━━━━━━━━━━━━━━━━
+  // 2. Set the lock SYNCHRONOUSLY before starting the background task
+  isGlobalBroadcastRunning = true
 
-${message}
-
-━━━━━━━━━━━━━━━━━━━
-
-<i>Sending to ${filterType}...</i>
-
-<i>I'll send you a summary when done!</i>`)
-
-  // Build query for recipients
-  let whereClause: any = {}
-
-  if (planType !== 'all') {
-    whereClause.planType = planType
-  }
-
-  if (activeOnly) {
-    whereClause.expiresAt = { gt: new Date() }
-    whereClause.isRemoved = false
-  }
-
-  // Get all unique telegram user IDs
-  let recipients: { telegramUserId: string }[] = []
-
-  if (planType === 'all' && !activeOnly) {
-    // Default for /broadcast: Send to EVERYONE in the User table
-    recipients = await prisma.user.findMany({
-      select: { telegramUserId: true }
-    })
-    console.log(`[Broadcast] Targeting ALL users from User table: ${recipients.length} recipients`)
-  } else {
-    // Filtered broadcast: Get unique telegram user IDs from subscriptions
-    const subs = await prisma.subscription.findMany({
-      where: whereClause,
-      select: {
-        telegramUserId: true,
-      },
-      distinct: ['telegramUserId']
-    })
-    recipients = subs
-    console.log(`[Broadcast] Targeting filtered users from Subscription table: ${recipients.length} recipients`)
-  }
-
-  // Send message to each user
-  let successCount = 0
-  let failedCount = 0
-  const failedUsers: string[] = []
-
-  // Support for optional button in broadcast: "Your message | Button Text | callback_data"
-  // Example: "/broadcast 🎉 BIG PROMO! | 🔥 Pay ₦3,000 | pay_promo"
-  const messageParts = message.split('|').map(p => p.trim())
-  const cleanMessage = messageParts[0]
-  const buttonText = messageParts[1]
-  const callbackData = messageParts[2]
-
-  for (const recipient of recipients) {
+  // 3. Start the background process without awaiting the loop
+  ;(async () => {
     try {
-      let sent = false
-      if (buttonText && callbackData) {
-        sent = await sendMessageWithKeyboard(recipient.telegramUserId, cleanMessage, {
-          inline_keyboard: [[{ text: buttonText, callback_data: callbackData }]]
+      // Build query for recipients
+      let whereClause: any = {}
+      if (planType !== 'all') whereClause.planType = planType
+      if (activeOnly) {
+        whereClause.expiresAt = { gt: new Date() }
+        whereClause.isRemoved = false
+      }
+
+      let recipients: { telegramUserId: string }[] = []
+      if (planType === 'all' && !activeOnly) {
+        recipients = await prisma.user.findMany({ select: { telegramUserId: true } })
+      } else {
+        recipients = await prisma.subscription.findMany({
+          where: whereClause,
+          select: { telegramUserId: true },
+          distinct: ['telegramUserId']
         })
-      } else {
-        sent = await sendMessage(recipient.telegramUserId, cleanMessage)
       }
 
-      if (sent) {
-        successCount++
-      } else {
-        failedCount++
+      console.log(`[Broadcast] Starting background loop for ${recipients.length} users`)
+
+      let successCount = 0
+      let failedCount = 0
+
+      for (const recipient of recipients) {
+        try {
+          let sent = false
+          if (buttonText && callbackData) {
+            sent = await sendMessageWithKeyboard(recipient.telegramUserId, cleanMessage, {
+              inline_keyboard: [[{ text: buttonText, callback_data: callbackData }]]
+            })
+          } else {
+            sent = await sendMessage(recipient.telegramUserId, cleanMessage)
+          }
+          if (sent) successCount++
+          else failedCount++
+        } catch (error) {
+          failedCount++
+        }
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
-    } catch (error) {
-      failedCount++
+
+      await sendMessage(user.id, `✅ <b>Broadcast Complete!</b>\n\n📊 <b>Stats:</b>\n• Successful: ${successCount}\n• Failed: ${failedCount}`)
+    } catch (err) {
+      console.error('[Broadcast Task] Error:', err)
+    } finally {
+      isGlobalBroadcastRunning = false
     }
-
-    // Add delay to avoid rate limiting
-    await new Promise(resolve => setTimeout(resolve, 100))
-  }
-
-  // Send summary to admin
-  const summary = `✅ <b>Broadcast Complete!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-📊 <b>Stats:</b>
-• Total recipients: ${recipients.length}
-• ✅ Successful: ${successCount}
-• ❌ Failed: ${failedCount}
-
-${failedUsers.length > 0 ? `❌ <b>Failed Users:</b>\n${failedUsers.slice(0, 10).join('\n')}${failedUsers.length > 10 ? `\n... and ${failedUsers.length - 10} more` : ''}` : ''}`
-
-  await sendMessage(user.id, summary)
-
-  // Reset broadcast running flag
-  isCopierPromoBroadcastRunning = false
+  })()
 }
 
 /**
