@@ -901,6 +901,146 @@ async function handleBroadcastPremium(user: TelegramUser, args: string[]): Promi
 }
 
 /**
+ * Handle /broadcast_copier_promo command - Admin only
+ * Sends copier promo with payment button to ALL users
+ * Usage: /broadcast_copier_promo
+ */
+async function handleCopierPromoBroadcast(user: TelegramUser): Promise<void> {
+  // Check if user is admin
+  if (user.id !== ADMIN_ID) {
+    await sendMessage(user.id, '❌ Only admin can use this command.')
+    return
+  }
+
+  const message = `🔥 <b>LIMITED TIME OFFER - 24 HOURS ONLY!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+🎯 <b>Get the Auto Copier Bot for ₦15,000!</b>
+
+Regular Price: <s>₦22,000</s>
+<b>YOUR PRICE: ₦15,000</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>🚀 How It Works:</b>
+
+✅ <b>Automated bot that trades for you</b> - No manual work needed!
+✅ <b>It analyzes trades and places them for you</b> as well
+✅ <b>Same trades</b> from the VIP signals channel
+✅ <b>96% win rate</b> on all trades
+✅ <b>Works 24/7</b> - even when your phone is OFF
+✅ <b>Full 14 days</b> of automated trading
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>Offer expires in 24 hours!</b> After that, price returns to ₦22,000.
+
+👇 Tap the button below to get your payment link now!`
+
+  const replyMarkup = {
+    inline_keyboard: [[
+      { text: '🔥 GET ₦15,000 PROMO (Auto Copier)', callback_data: 'promo_copier_24hr' }
+    ]]
+  }
+
+  await sendMessage(user.id, `📢 <b>Broadcasting copier promo...</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+${message}
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Sending to all users...</i>
+<i>I'll send you a summary when done!</i>`)
+
+  // Get ALL users (send to everyone, including previous buyers)
+  const allUsers = await prisma.user.findMany({
+    select: { telegramUserId: true }
+  })
+  console.log(`[Copier Promo Broadcast] Targeting ALL users from User table: ${allUsers.length} recipients`)
+
+  let successCount = 0
+  let failedCount = 0
+  const failedUsers: string[] = []
+
+  for (const recipient of allUsers) {
+    try {
+      const sent = await sendMessageWithKeyboard(recipient.telegramUserId, message, replyMarkup)
+      if (sent) {
+        successCount++
+      } else {
+        failedCount++
+        failedUsers.push(recipient.telegramUserId.toString())
+      }
+    } catch (error) {
+      failedCount++
+      console.error(`Failed to send to ${recipient.telegramUserId}:`, error)
+    }
+
+    await new Promise(resolve => setTimeout(resolve, 100))
+  }
+
+  await sendMessage(user.id, `✅ <b>Copier Promo Broadcast Complete!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+📊 <b>Stats:</b>
+• ✅ Sent successfully: ${successCount}
+• ❌ Failed: ${failedCount}
+
+━━━━━━━━━━━━━━━━━━━`)
+}
+
+/**
+ * Handle /test_copier_promo command - Admin only
+ * Sends copier promo to admin only (for testing)
+ * Usage: /test_copier_promo
+ */
+async function handleTestCopierPromoBroadcast(user: TelegramUser): Promise<void> {
+  // Check if user is admin
+  if (user.id !== ADMIN_ID) {
+    await sendMessage(user.id, '❌ Only admin can use this command.')
+    return
+  }
+
+  const message = `🔥 <b>LIMITED TIME OFFER - 24 HOURS ONLY!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+🎯 <b>Get the Auto Copier Bot for ₦15,000!</b>
+
+Regular Price: <s>₦22,000</s>
+<b>YOUR PRICE: ₦15,000</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>🚀 How It Works:</b>
+
+✅ <b>Automated bot that trades for you</b> - No manual work needed!
+✅ <b>It analyzes trades and places them for you</b> as well
+✅ <b>Same trades</b> from VIP signals channel
+✅ <b>96% win rate</b> on all trades
+✅ <b>Works 24/7</b> - even when your phone is OFF
+✅ <b>Full 14 days</b> of automated trading
+
+━━━━━━━━━━━━━━━━━━━
+
+⚠️ <b>Offer expires in 24 hours!</b> After that, price returns to ₦22,000.
+
+👇 Tap the button below to get your payment link now!`
+
+  const replyMarkup = {
+    inline_keyboard: [[
+      { text: '🔥 GET ₦15,000 PROMO (Auto Copier)', callback_data: 'promo_copier_24hr' }
+    ]]
+  }
+
+  await sendMessageWithKeyboard(user.id, message, replyMarkup)
+}
+
+/**
  * Handle /broadcast_promo command - Admin only
  * Sends promo offer with payment button to ALL users
  * Usage: /broadcast_promo
@@ -4177,6 +4317,14 @@ Or send /cancel to exit.`
 
       case '/list_promos':
         await handleListPromos(from)
+        break
+
+      case '/broadcast_copier_promo':
+        await handleCopierPromoBroadcast(from)
+        break
+
+      case '/test_copier_promo':
+        await handleTestCopierPromoBroadcast(from)
         break
 
       case '/delete_promo':
