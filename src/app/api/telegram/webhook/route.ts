@@ -190,22 +190,22 @@ ${statsSection}
 
 Choose a plan to get instant access to our VIP community:
 
-💎 <b>Basic Plan</b> - ${trialEligible ? '₦8,000' : '₦10,000'} ${trialEligible ? '<s> (was ₦10,000)</s>' : ''}
+💎 <b>Basic Plan</b> - ${trialEligible ? '₦5,000' : '₦10,000'} ${trialEligible ? '<s> (was ₦10,000)</s>' : ''}
 ├─ <b>7 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Perfect for trying out
 
-📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦13,600' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
+📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Great balance of price & duration
 
-📅 <b>Monthly Plan</b> - ${trialEligible ? '₦28,000' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
+📅 <b>Monthly Plan</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
 ├─ <b>30 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Best value for serious traders
 
-👑 <b>Premium Plan - AUTO COPIER</b> - ${trialEligible ? '₦17,600' : '₦22,000'} ⭐ ${trialEligible ? '<s> (was ₦22,000)</s>' : ''}
+👑 <b>Premium Plan - AUTO COPIER</b> - ${trialEligible ? '₦11,000' : '₦22,000'} ⭐ ${trialEligible ? '<s> (was ₦22,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
 ├─ 🤖 <b>AUTO COPIER BOT</b> - We copy trades FOR YOU!
 ├─ Trades execute <b>instantly</b> on your MT5
@@ -582,26 +582,26 @@ ${TRIAL_DISCOUNT.discountMessage}
 
 ━━━━━━━━━━━━━━━━━━━
 
-💎 Special Prices (20% OFF):
+💎 Special Prices (50% OFF):
 
 ` : ''}
 
-💎 <b>Basic Plan</b> - ${trialEligible ? '₦8,000' : '₦10,000'}
+💎 <b>Basic Plan</b> - ${trialEligible ? '₦5,000' : '₦10,000'}
 ├─ <b>7 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ For trying out
 
-📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦13,600' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
+📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Great balance of price & duration
 
-📅 <b>Monthly Plan</b> - ${trialEligible ? '₦28,000' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
+📅 <b>Monthly Plan</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
 ├─ <b>30 days</b> access to VIP signals
 ├─ You copy trades manually
 └─ Best for consistent trading
 
-👑 <b>Premium - AUTO COPIER</b> - ${trialEligible ? '₦17,600' : '₦22,000'} ⭐ ${trialEligible ? '<s> (was ₦22,000)</s>' : ''}
+👑 <b>Premium - AUTO COPIER</b> - ${trialEligible ? '₦11,000' : '₦22,000'} ⭐ ${trialEligible ? '<s> (was ₦22,000)</s>' : ''}
 ├─ <b>14 days</b> VIP signals + <b>AUTO COPIER BOT</b>
 ├─ 🤖 Trades copy <b>automatically</b> to your MT5
 ├─ 💰 Make money while you sleep
@@ -638,10 +638,10 @@ Then send: /verify_basic REFERENCE
 
 Or send /pay to start over
 
-💎 Pay ${trialEligible ? '₦8,000' : '₦10,000'} (Basic - 7 days) ${trialEligible ? '🔥 20% OFF!' : ''}
-📊 Pay ${trialEligible ? '₦13,600' : '₦17,000'} (Bi-Weekly - 14 days) ${trialEligible ? '🔥 20% OFF!' : ''}
-📅 Pay ${trialEligible ? '₦28,000' : '₦35,000'} (Monthly - 30 days) ${trialEligible ? '🔥 20% OFF!' : ''}
-👑 Pay ${trialEligible ? '₦17,600' : '₦22,000'} (Premium - 14 days + Auto Copier) ⭐ ${trialEligible ? '🔥 20% OFF!' : ''}
+💎 Pay ${trialEligible ? '₦5,000' : '₦10,000'} (Basic - 7 days) ${trialEligible ? '🔥 50% OFF!' : ''}
+📊 Pay ${trialEligible ? '₦8,500' : '₦17,000'} (Bi-Weekly - 14 days) ${trialEligible ? '🔥 50% OFF!' : ''}
+📅 Pay ${trialEligible ? '₦17,500' : '₦35,000'} (Monthly - 30 days) ${trialEligible ? '🔥 50% OFF!' : ''}
+👑 Pay ${trialEligible ? '₦11,000' : '₦22,000'} (Premium - 14 days + Auto Copier) ⭐ ${trialEligible ? '🔥 50% OFF!' : ''}
 
 Still have questions? Send /help`
 
@@ -657,25 +657,25 @@ Still have questions? Send /help`
         reply_markup: {
           inline_keyboard: [
             [
-              { text: `💎 Pay ${trialEligible ? '₦8,000 (was ₦10,000)' : '₦10,000'} - Basic`, url: basicData.authorizationUrl }
+              { text: `💎 Pay ${trialEligible ? '₦5,000 (was ₦10,000)' : '₦10,000'} - Basic`, url: basicData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Basic Payment', callback_data: 'verify_basic' }
             ],
             [
-              { text: `📊 Pay ${trialEligible ? '₦13,600 (was ₦17,000)' : '₦17,000'} - Bi-Weekly`, url: biweeklyData.authorizationUrl }
+              { text: `📊 Pay ${trialEligible ? '₦8,500 (was ₦17,000)' : '₦17,000'} - Bi-Weekly`, url: biweeklyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Bi-Weekly Payment', callback_data: 'verify_biweekly' }
             ],
             [
-              { text: `📅 Pay ${trialEligible ? '₦28,000 (was ₦35,000)' : '₦35,000'} - Monthly`, url: monthlyData.authorizationUrl }
+              { text: `📅 Pay ${trialEligible ? '₦17,500 (was ₦35,000)' : '₦35,000'} - Monthly`, url: monthlyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Monthly Payment', callback_data: 'verify_monthly' }
             ],
             [
-              { text: `👑 Pay ${trialEligible ? '₦17,600 (was ₦22,000)' : '₦22,000'} - Premium ⭐`, url: premiumData.authorizationUrl }
+              { text: `👑 Pay ${trialEligible ? '₦11,000 (was ₦22,000)' : '₦22,000'} - Premium ⭐`, url: premiumData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Premium Payment', callback_data: 'verify_premium' }

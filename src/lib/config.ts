@@ -73,9 +73,9 @@ export const TRADE_STATS_CONFIG = {
 // Trial Discount Configuration
 export const TRIAL_DISCOUNT = {
   enabled: true,
-  discountPercent: 20, // 20% discount for trial users upgrading
+  discountPercent: 50, // 50% discount for trial users upgrading
   discountDurationHours: 24, // Discount valid for 24 hours after trial ends
-  discountMessage: '🎉 EXCLUSIVE TRIAL OFFER! Upgrade within 24 hours and get 20% OFF all plans!'
+  discountMessage: '🎉 EXCLUSIVE TRIAL OFFER! Upgrade within 24 hours and get 50% OFF all plans!'
 } as const
 
 // Helper function to get plan by type

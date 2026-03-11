@@ -185,16 +185,16 @@ Don't lose momentum - get back in the game!
 
 ━━━━━━━━━━━━━━━━━━━
 
-🎁 <b>SPECIAL OFFER - 20% OFF!</b>
-Because you just completed your trial, we're giving you a 20% discount on ALL plans!
+🎁 <b>SPECIAL OFFER - 50% OFF!</b>
+Because you just completed your trial, we're giving you a 50% discount on ALL plans!
 <i>(Valid for the next 24 hours only)</i>
 
 ━━━━━━━━━━━━━━━━━━━
 
-💎 Basic: ₦8,000 <s>(was ₦10,000)</s> - 7 days
-📊 Bi-Weekly: ₦13,600 <s>(was ₦17,000)</s> - 14 days
-📅 Monthly: ₦28,000 <s>(was ₦35,000)</s> - 30 days
-👑 Premium: ₦17,600 <s>(was ₦22,000)</s> - 14 days + Copier
+💎 Basic: ₦5,000 <s>(was ₦10,000)</s> - 7 days
+📊 Bi-Weekly: ₦8,500 <s>(was ₦17,000)</s> - 14 days
+📅 Monthly: ₦17,500 <s>(was ₦35,000)</s> - 30 days
+👑 Premium: ₦11,000 <s>(was ₦22,000)</s> - 14 days + Copier
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -229,7 +229,7 @@ Or type /pay to get started.`
               expiryMessage,
               {
                 inline_keyboard: [[
-                  { text: '💳 Upgrade Now (20% OFF)', callback_data: 'pay' }
+                  { text: '💳 Upgrade Now (50% OFF)', callback_data: 'pay' }
                 ]]
               }
             )

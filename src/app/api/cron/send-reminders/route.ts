@@ -45,14 +45,14 @@ Those signals stop when your trial ends.
 
 🔥 <b>HERE IS YOUR EXCLUSIVE OFFER:</b>
 
-Because you tried us out, we're giving you <b>20% OFF</b> to upgrade today.
+Because you tried us out, we're giving you <b>50% OFF</b> to upgrade today.
 
 This discount disappears in <b>24 hours</b> after your trial ends. After that, prices go back to normal — no exceptions.
 
-💎 Basic → <b>₦8,000</b> <s>(usually ₦10,000)</s> — 7 days
-📊 Bi-Weekly → <b>₦13,600</b> <s>(usually ₦17,000)</s> — 14 days
-📅 Monthly → <b>₦28,000</b> <s>(usually ₦35,000)</s> — 30 days
-👑 Premium → <b>₦17,600</b> <s>(usually ₦22,000)</s> — 14 days + Auto Copier
+💎 Basic → <b>₦5,000</b> <s>(usually ₦10,000)</s> — 7 days
+📊 Bi-Weekly → <b>₦8,500</b> <s>(usually ₦17,000)</s> — 14 days
+📅 Monthly → <b>₦17,500</b> <s>(usually ₦35,000)</s> — 30 days
+👑 Premium → <b>₦11,000</b> <s>(usually ₦22,000)</s> — 14 days + Auto Copier
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -63,7 +63,7 @@ Tap below to lock in your discount before it's gone.`
         await sendMessageWithKeyboard(subscription.telegramUserId, message, {
           inline_keyboard: [
             [
-              { text: '🔥 Upgrade Now — 20% OFF (24hrs only)', callback_data: 'pay' }
+              { text: '🔥 Upgrade Now — 50% OFF (24hrs only)', callback_data: 'pay' }
             ]
           ]
         })
