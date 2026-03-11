@@ -30,6 +30,7 @@ const pendingCopierPromoEmailUsers = new Set<string>()
 
 // Track if a broadcast is currently running (to prevent Telegram retries from starting multiple loops)
 let isGlobalBroadcastRunning = false
+let shouldCancelBroadcast = false
 
 // Store users waiting to verify payment (userId -> planType)
 const pendingVerificationUsers = new Map<string, PlanType>()
@@ -1410,6 +1411,11 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
       let failedCount = 0
 
       for (const recipient of recipients) {
+        if (shouldCancelBroadcast) {
+          console.log('[Broadcast] STOPPED by admin command.')
+          await sendMessage(user.id, `🛑 <b>Broadcast Stopped!</b>\n\nI have stopped the remaining sends as requested.`)
+          break
+        }
         try {
           let sent = false
           if (buttonText && callbackData) {
@@ -1432,8 +1438,27 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
       console.error('[Broadcast Task] Error:', err)
     } finally {
       isGlobalBroadcastRunning = false
+      shouldCancelBroadcast = false
     }
   })()
+}
+
+/**
+ * Handle /stop_broadcast command - Admin only
+ */
+async function handleStopBroadcast(user: TelegramUser): Promise<void> {
+  if (user.id !== ADMIN_ID) {
+    await sendMessage(user.id, '❌ Only the admin can use this.')
+    return
+  }
+
+  if (!isGlobalBroadcastRunning) {
+    await sendMessage(user.id, 'ℹ️ No broadcast is currently running.')
+    return
+  }
+
+  shouldCancelBroadcast = true
+  await sendMessage(user.id, '🛑 <b>Stopping broadcast...</b>\n\nThe current loop will stop after the next attempt.')
 }
 
 /**
@@ -4619,6 +4644,10 @@ Or send /cancel to exit.`
 
       case '/broadcast_promo':
         await handleBroadcastPromo(from)
+        break
+
+      case '/stop_broadcast':
+        await handleStopBroadcast(from)
         break
 
       case '/create_promo':
