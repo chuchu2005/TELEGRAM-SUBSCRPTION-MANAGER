@@ -4225,7 +4225,7 @@ Or send /cancel to exit.`
         const newCommand = `/${targetCmd}`
 
         // Only re-map if it's a known command to avoid hijacking /start
-        const knownCommands = ['/promo', '/pay', '/verify', '/checkuser', '/status', '/help']
+        const knownCommands = ['/promo', '/pay', '/verify', '/checkuser', '/status', '/help', '/referral']
         if (knownCommands.includes(newCommand)) {
           console.log(`[DeepLink] Re-routing /start ${payload} to ${newCommand} ${cmdArgs.join(' ')}`)
           // We don't want to lose the user registration, but we skip handleStart
@@ -4265,6 +4265,9 @@ Or send /cancel to exit.`
               case '/help':
                 await handleHelp(from)
                 break
+              case '/referral':
+                await handleReferral(from)
+                break
               case 'start_trial':
                 await handleTrial(from)
                 break
@@ -4283,6 +4286,9 @@ Or send /cancel to exit.`
         }
       } else if (payload === 'help') {
         await handleHelp(from)
+        return NextResponse.json({ ok: true })
+      } else if (payload === 'referral') {
+        await handleReferral(from)
         return NextResponse.json({ ok: true })
       } else if (payload === 'status') {
         await handleStatus(from)
