@@ -135,7 +135,7 @@ async function ensureJoinedChannel(userId: string | number): Promise<boolean> {
 
     const response = await getChatMember(userId, GENERAL_CHANNEL_ID)
     console.log(`[ChannelCheck] Telegram response for ${userId} in ${GENERAL_CHANNEL_ID}:`, JSON.stringify(response))
-    
+
     if (response.ok && ['member', 'administrator', 'creator'].includes(response.result?.status || '')) {
       console.log(`[ChannelCheck] User ${userId} verified as ${response.result?.status}`)
       await prisma.user.update({
@@ -144,7 +144,7 @@ async function ensureJoinedChannel(userId: string | number): Promise<boolean> {
       })
       return true
     }
-    
+
     console.log(`[ChannelCheck] User ${userId} not a member. Status: ${response.result?.status || 'unknown'}`)
     return false
   } catch (err) {
@@ -158,7 +158,7 @@ async function ensureJoinedChannel(userId: string | number): Promise<boolean> {
  */
 async function sendJoinRequest(userId: string | number): Promise<void> {
   const message = `👋 <b>Welcome!</b>\n\nTo use this bot, you must be a member of our main channel first.\n\n👇 <b>Join here:</b>\n@${GENERAL_CHANNEL_ID.replace('@', '')}\n\n<i>After joining, click the button below!</i>`
-  
+
   await sendMessageWithKeyboard(userId, message, {
     inline_keyboard: [
       [{ text: '📢 Join Channel', url: `https://t.me/${GENERAL_CHANNEL_ID.replace('@', '')}` }],
@@ -197,7 +197,7 @@ When someone joins using your link and pays for <b>ANY</b> plan, you instantly g
 <i>Example: Your friend buys a ₦35,000 Monthly plan. BOOM! You instantly get 30 days of VIP Access completely free!</i>
 
 <b>2. The 20-Referral Milestone 🏆</b>
-Every 20 successful referrals you bring in, we will automatically reward you with a <b>FREE 7-Day Basic Plan</b> on top of your existing rewards!
+Every 20 successful referrals(PEOPLE WHO ONLY CLICKED YOUR REFERRAL LINK ONLY) you bring in, we will automatically reward you with a <b>FREE 7-Day Basic Plan</b> on top of your existing rewards!
 
 There is <b>NO LIMIT</b> on how many free plans you can earn. Share in groups, statuses, or with friends and let our bot make you a VIP for life!
 
@@ -248,7 +248,7 @@ Start sharing your link on your status or with trader friends now!`)
     orderBy: { createdAt: 'desc' }
   })
   const countedSoFar = lastMilestone?.totalReferrals ?? 0
-  
+
   // Progress only counts users who have JOINED the channel
   const referralsSinceLastMilestone = confirmedJoins - countedSoFar
   const progressTo20 = Math.min(Math.max(0, referralsSinceLastMilestone), 20)
@@ -1383,64 +1383,64 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
   // 2. Set the lock SYNCHRONOUSLY before starting the background task
   isGlobalBroadcastRunning = true
 
-  // 3. Start the background process without awaiting the loop
-  ;(async () => {
-    try {
-      // Build query for recipients
-      let whereClause: any = {}
-      if (planType !== 'all') whereClause.planType = planType
-      if (activeOnly) {
-        whereClause.expiresAt = { gt: new Date() }
-        whereClause.isRemoved = false
-      }
-
-      let recipients: { telegramUserId: string }[] = []
-      if (planType === 'all' && !activeOnly) {
-        recipients = await prisma.user.findMany({ select: { telegramUserId: true } })
-      } else {
-        recipients = await prisma.subscription.findMany({
-          where: whereClause,
-          select: { telegramUserId: true },
-          distinct: ['telegramUserId']
-        })
-      }
-
-      console.log(`[Broadcast] Starting background loop for ${recipients.length} users`)
-
-      let successCount = 0
-      let failedCount = 0
-
-      for (const recipient of recipients) {
-        if (shouldCancelBroadcast) {
-          console.log('[Broadcast] STOPPED by admin command.')
-          await sendMessage(user.id, `🛑 <b>Broadcast Stopped!</b>\n\nI have stopped the remaining sends as requested.`)
-          break
+    // 3. Start the background process without awaiting the loop
+    ; (async () => {
+      try {
+        // Build query for recipients
+        let whereClause: any = {}
+        if (planType !== 'all') whereClause.planType = planType
+        if (activeOnly) {
+          whereClause.expiresAt = { gt: new Date() }
+          whereClause.isRemoved = false
         }
-        try {
-          let sent = false
-          if (buttonText && callbackData) {
-            sent = await sendMessageWithKeyboard(recipient.telegramUserId, cleanMessage, {
-              inline_keyboard: [[{ text: buttonText, callback_data: callbackData }]]
-            })
-          } else {
-            sent = await sendMessage(recipient.telegramUserId, cleanMessage)
+
+        let recipients: { telegramUserId: string }[] = []
+        if (planType === 'all' && !activeOnly) {
+          recipients = await prisma.user.findMany({ select: { telegramUserId: true } })
+        } else {
+          recipients = await prisma.subscription.findMany({
+            where: whereClause,
+            select: { telegramUserId: true },
+            distinct: ['telegramUserId']
+          })
+        }
+
+        console.log(`[Broadcast] Starting background loop for ${recipients.length} users`)
+
+        let successCount = 0
+        let failedCount = 0
+
+        for (const recipient of recipients) {
+          if (shouldCancelBroadcast) {
+            console.log('[Broadcast] STOPPED by admin command.')
+            await sendMessage(user.id, `🛑 <b>Broadcast Stopped!</b>\n\nI have stopped the remaining sends as requested.`)
+            break
           }
-          if (sent) successCount++
-          else failedCount++
-        } catch (error) {
-          failedCount++
+          try {
+            let sent = false
+            if (buttonText && callbackData) {
+              sent = await sendMessageWithKeyboard(recipient.telegramUserId, cleanMessage, {
+                inline_keyboard: [[{ text: buttonText, callback_data: callbackData }]]
+              })
+            } else {
+              sent = await sendMessage(recipient.telegramUserId, cleanMessage)
+            }
+            if (sent) successCount++
+            else failedCount++
+          } catch (error) {
+            failedCount++
+          }
+          await new Promise(resolve => setTimeout(resolve, 100))
         }
-        await new Promise(resolve => setTimeout(resolve, 100))
-      }
 
-      await sendMessage(user.id, `✅ <b>Broadcast Complete!</b>\n\n📊 <b>Stats:</b>\n• Successful: ${successCount}\n• Failed: ${failedCount}`)
-    } catch (err) {
-      console.error('[Broadcast Task] Error:', err)
-    } finally {
-      isGlobalBroadcastRunning = false
-      shouldCancelBroadcast = false
-    }
-  })()
+        await sendMessage(user.id, `✅ <b>Broadcast Complete!</b>\n\n📊 <b>Stats:</b>\n• Successful: ${successCount}\n• Failed: ${failedCount}`)
+      } catch (err) {
+        console.error('[Broadcast Task] Error:', err)
+      } finally {
+        isGlobalBroadcastRunning = false
+        shouldCancelBroadcast = false
+      }
+    })()
 }
 
 /**
@@ -4083,7 +4083,7 @@ Or send /cancel to exit.`
         if (hasJoined) {
           // Send a brief success alert
           await answerCallbackQuery(id, '✅ Thank you! Access granted.')
-          
+
           // Check if this user was referred and hasn't had their referral "count" yet
           const pendingReferral = await prisma.referral.findFirst({
             where: { referredUserId: userId, hasJoined: false }
@@ -4099,7 +4099,7 @@ Or send /cancel to exit.`
             // NOW notify the referrer
             try {
               await sendMessage(Number(referrerId), `🎉 <b>WOOHOO! A FRIEND JOINED!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n${from.username ? '@' + from.username : from.first_name} just joined the channel using your link!\n\nThat gets you <b>1 step closer</b> to your 20-click FREE VIP week! 🏃‍♂️💨\n\nKeep sharing! Use /myrefs to see your total.`)
-              
+
               // And check for the milestone
               await checkAndAwardReferralMilestone(referrerId)
             } catch (err) {
