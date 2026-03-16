@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText, getChatMember } from '@/lib/telegram'
+import { generateMessageHash, hasReceivedMessageRecently, logBroadcastMessage } from '@/lib/broadcast'
+import { BROADCAST_CONFIG } from '@/lib/broadcast-config'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
 import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID, TRADE_STATS_CONFIG, TRIAL_DISCOUNT, GENERAL_CHANNEL_ID, GENERAL_CHANNEL_NAME } from '@/lib/config'
 import { createMt5Account, updateCopierSettings, removeUserMt5Account } from '@/lib/metacopier'
@@ -31,6 +33,7 @@ const pendingCopierPromoEmailUsers = new Set<string>()
 // Track if a broadcast is currently running (to prevent Telegram retries from starting multiple loops)
 let isGlobalBroadcastRunning = false
 let shouldCancelBroadcast = false
+let broadcastStartTime: number | null = null
 
 // Store users waiting to verify payment (userId -> planType)
 const pendingVerificationUsers = new Map<string, PlanType>()
@@ -1382,65 +1385,123 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
 
   // 2. Set the lock SYNCHRONOUSLY before starting the background task
   isGlobalBroadcastRunning = true
+  broadcastStartTime = Date.now()
 
-    // 3. Start the background process without awaiting the loop
-    ; (async () => {
-      try {
-        // Build query for recipients
-        let whereClause: any = {}
-        if (planType !== 'all') whereClause.planType = planType
-        if (activeOnly) {
-          whereClause.expiresAt = { gt: new Date() }
-          whereClause.isRemoved = false
-        }
-
-        let recipients: { telegramUserId: string }[] = []
-        if (planType === 'all' && !activeOnly) {
-          recipients = await prisma.user.findMany({ select: { telegramUserId: true } })
-        } else {
-          recipients = await prisma.subscription.findMany({
-            where: whereClause,
-            select: { telegramUserId: true },
-            distinct: ['telegramUserId']
-          })
-        }
-
-        console.log(`[Broadcast] Starting background loop for ${recipients.length} users`)
-
-        let successCount = 0
-        let failedCount = 0
-
-        for (const recipient of recipients) {
-          if (shouldCancelBroadcast) {
-            console.log('[Broadcast] STOPPED by admin command.')
-            await sendMessage(user.id, `🛑 <b>Broadcast Stopped!</b>\n\nI have stopped the remaining sends as requested.`)
-            break
-          }
-          try {
-            let sent = false
-            if (buttonText && callbackData) {
-              sent = await sendMessageWithKeyboard(recipient.telegramUserId, cleanMessage, {
-                inline_keyboard: [[{ text: buttonText, callback_data: callbackData }]]
-              })
-            } else {
-              sent = await sendMessage(recipient.telegramUserId, cleanMessage)
-            }
-            if (sent) successCount++
-            else failedCount++
-          } catch (error) {
-            failedCount++
-          }
-          await new Promise(resolve => setTimeout(resolve, 100))
-        }
-
-        await sendMessage(user.id, `✅ <b>Broadcast Complete!</b>\n\n📊 <b>Stats:</b>\n• Successful: ${successCount}\n• Failed: ${failedCount}`)
-      } catch (err) {
-        console.error('[Broadcast Task] Error:', err)
-      } finally {
-        isGlobalBroadcastRunning = false
-        shouldCancelBroadcast = false
+  // 3. Start the background process without awaiting the loop
+  ;(async () => {
+    try {
+      // Build query for recipients
+      let whereClause: any = {}
+      if (planType !== 'all') whereClause.planType = planType
+      if (activeOnly) {
+        whereClause.expiresAt = { gt: new Date() }
+        whereClause.isRemoved = false
       }
-    })()
+
+      let recipients: { telegramUserId: string }[] = []
+      if (planType === 'all' && !activeOnly) {
+        recipients = await prisma.user.findMany({ select: { telegramUserId: true } })
+      } else {
+        recipients = await prisma.subscription.findMany({
+          where: whereClause,
+          select: { telegramUserId: true },
+          distinct: ['telegramUserId']
+        })
+      }
+
+      // Handle empty recipient list
+      if (recipients.length === 0) {
+        await sendMessage(user.id, `❌ No users match the specified criteria.`)
+        return
+      }
+
+      console.log(`[Broadcast] Starting background loop for ${recipients.length} users`)
+
+      // Generate message hash once for all recipients
+      const messageHash = generateMessageHash(cleanMessage)
+
+      let successCount = 0
+      let failedCount = 0
+      let duplicateCount = 0
+      const failedUsers: string[] = []
+
+      for (const recipient of recipients) {
+        // Check for broadcast timeout (2 hours max)
+        if (broadcastStartTime && Date.now() - broadcastStartTime > BROADCAST_CONFIG.BROADCAST_TIMEOUT_HOURS * 60 * 60 * 1000) {
+          console.warn('[Broadcast] Timeout reached, releasing lock')
+          await sendMessage(user.id, `⏱️ <b>Broadcast Timeout</b>\n\nThe broadcast has been running for ${BROADCAST_CONFIG.BROADCAST_TIMEOUT_HOURS} hours and has timed out. The lock has been released.`)
+          break
+        }
+
+        // Check for cancellation
+        if (shouldCancelBroadcast) {
+          console.log('[Broadcast] STOPPED by admin command.')
+          await sendMessage(user.id, `🛑 <b>Broadcast Stopped!</b>\n\nI have stopped the remaining sends as requested.`)
+          break
+        }
+
+        // Check for duplicate (deduplication)
+        const hasReceived = await hasReceivedMessageRecently(recipient.telegramUserId, messageHash)
+        if (hasReceived) {
+          duplicateCount++
+          console.log(`[Broadcast] Skipped duplicate for user ${recipient.telegramUserId}`)
+          await new Promise(resolve => setTimeout(resolve, BROADCAST_CONFIG.RATE_LIMIT_MS))
+          continue
+        }
+
+        try {
+          let sent = false
+          if (buttonText && callbackData) {
+            sent = await sendMessageWithKeyboard(recipient.telegramUserId, cleanMessage, {
+              inline_keyboard: [[{ text: buttonText, callback_data: callbackData }]]
+            })
+          } else {
+            sent = await sendMessage(recipient.telegramUserId, cleanMessage)
+          }
+
+          if (sent) {
+            successCount++
+            // Log successful send to database
+            try {
+              await logBroadcastMessage(recipient.telegramUserId, messageHash)
+            } catch (logError) {
+              // Don't stop broadcast - message was already sent
+              console.error(`Failed to log broadcast for user ${recipient.telegramUserId}:`, logError)
+            }
+          } else {
+            failedCount++
+            failedUsers.push(recipient.telegramUserId)
+          }
+        } catch (error: any) {
+          // Handle Telegram rate limit (429 error)
+          if (error?.response?.status === 429) {
+            const retryAfter = error.response.data?.retry_after || 30
+            console.warn(`[Broadcast] Rate limited, waiting ${retryAfter}s`)
+            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000))
+            continue // Retry this user
+          }
+
+          // Handle other errors
+          failedCount++
+          failedUsers.push(recipient.telegramUserId)
+          console.error(`[Broadcast] Failed to send to ${recipient.telegramUserId}:`, error)
+        }
+
+        // Rate limiting delay
+        await new Promise(resolve => setTimeout(resolve, BROADCAST_CONFIG.RATE_LIMIT_MS))
+      }
+
+      await sendMessage(user.id, `✅ <b>Broadcast Complete!</b>\n\n📊 <b>Stats:</b>\n• Successful: ${successCount}\n• Failed: ${failedCount}\n• Skipped (duplicate): ${duplicateCount}\n\n${failedUsers.length > 0 ? `❌ Failed users:\n${failedUsers.slice(0, 10).join('\n')}${failedUsers.length > 10 ? '\n...and more' : ''}` : ''}`)
+    } catch (err) {
+      console.error('[Broadcast Task] Error:', err)
+      await sendMessage(user.id, `❌ <b>Broadcast Error</b>\n\nAn error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`)
+    } finally {
+      // Always release lock, even on error
+      isGlobalBroadcastRunning = false
+      shouldCancelBroadcast = false
+      broadcastStartTime = null
+    }
+  })()
 }
 
 /**
