@@ -176,3 +176,13 @@ model ReferralReward {
   @@index([referrerId])
   @@index([isActive])
 }
+
+model BroadcastLog {
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  messageHash   String   // SHA-256 hash of message content
+  telegramUserId String   // User who received the message
+  sentAt        DateTime @default(now())
+
+  @@unique([messageHash, telegramUserId])
+  @@index([sentAt])
+}
