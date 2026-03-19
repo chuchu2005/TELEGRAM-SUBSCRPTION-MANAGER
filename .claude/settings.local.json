@@ -16,7 +16,8 @@
       "Bash(python:*)",
       "Bash(tree:*)",
       "WebSearch",
-      "Bash(grep:*)"
+      "Bash(grep:*)",
+      "Bash(npx prisma:*)"
     ]
   }
 }

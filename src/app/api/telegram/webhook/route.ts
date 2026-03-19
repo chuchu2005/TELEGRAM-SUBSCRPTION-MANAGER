@@ -1465,6 +1465,8 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
 
       await sendMessage(user.id, `📊 <b>Broadcast Started!</b>\n\nFound ${recipients.length} recipients\nSending ${recipients.length > progressInterval ? '(with progress updates)' : '...'}\n\nTarget: ${filterType}`)
 
+      console.log('[Broadcast] Starting send loop for', recipients.length, 'recipients')
+
       for (const recipient of recipients) {
         // Check for broadcast timeout (2 hours max)
         if (broadcastStartTime && Date.now() - broadcastStartTime > BROADCAST_CONFIG.BROADCAST_TIMEOUT_HOURS * 60 * 60 * 1000) {
@@ -1481,7 +1483,15 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
         }
 
         // Check for duplicate (deduplication)
-        const hasReceived = await hasReceivedMessageRecently(recipient.telegramUserId, messageHash)
+        console.log(`[Broadcast] Checking deduplication for user ${recipient.telegramUserId}`)
+        let hasReceived = false
+        try {
+          hasReceived = await hasReceivedMessageRecently(recipient.telegramUserId, messageHash)
+        } catch (dedupError) {
+          console.error('[Broadcast] Deduplication check failed for', recipient.telegramUserId, ':', dedupError)
+          // Continue anyway if deduplication fails
+        }
+        console.log(`[Broadcast] Deduplication check result for ${recipient.telegramUserId}:`, hasReceived)
         if (hasReceived) {
           duplicateCount++
           console.log(`[Broadcast] Skipped duplicate for user ${recipient.telegramUserId}`)
@@ -1492,13 +1502,26 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
         console.log(`[Broadcast] Sending to user ${recipient.telegramUserId}...`)
         try {
           let sent = false
-          if (buttonText && callbackData) {
-            sent = await sendMessageWithKeyboard(recipient.telegramUserId, cleanMessage, {
-              inline_keyboard: [[{ text: buttonText, callback_data: callbackData }]]
-            })
-          } else {
-            sent = await sendMessage(recipient.telegramUserId, cleanMessage)
+
+          // Add timeout to prevent hanging
+          const sendTimeout = new Promise<boolean>((resolve) => {
+            setTimeout(() => {
+              console.log(`[Broadcast] Send timeout for user ${recipient.telegramUserId}`)
+              resolve(false)
+            }, 10000) // 10 second timeout
+          })
+
+          const sendPromise = async () => {
+            if (buttonText && callbackData) {
+              return await sendMessageWithKeyboard(recipient.telegramUserId, cleanMessage, {
+                inline_keyboard: [[{ text: buttonText, callback_data: callbackData }]]
+              })
+            } else {
+              return await sendMessage(recipient.telegramUserId, cleanMessage)
+            }
           }
+
+          sent = await Promise.race([sendPromise(), sendTimeout])
 
           if (sent) {
             console.log(`[Broadcast] ✓ Sent to user ${recipient.telegramUserId}`)
