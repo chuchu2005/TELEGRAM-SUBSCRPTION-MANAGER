@@ -1402,17 +1402,48 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
       }
 
       console.log('[Broadcast] Querying recipients...')
+
       let recipients: { telegramUserId: string }[] = []
-      if (planType === 'all' && !activeOnly) {
-        recipients = await prisma.user.findMany({ select: { telegramUserId: true } })
-      } else {
-        recipients = await prisma.subscription.findMany({
-          where: whereClause,
-          select: { telegramUserId: true },
-          distinct: ['telegramUserId']
-        })
+
+      // Use cursor-based pagination for large datasets
+      let skip = 0
+      const batchSize = 100
+      let hasMore = true
+
+      while (hasMore) {
+        try {
+          if (planType === 'all' && !activeOnly) {
+            console.log('[Broadcast] Fetching users batch, skip:', skip)
+            const batch = await prisma.user.findMany({
+              select: { telegramUserId: true },
+              skip: skip,
+              take: batchSize
+            })
+            recipients.push(...batch)
+            hasMore = batch.length === batchSize
+            skip += batchSize
+          } else {
+            console.log('[Broadcast] Fetching subscriptions batch, skip:', skip)
+            const batch = await prisma.subscription.findMany({
+              where: whereClause,
+              select: { telegramUserId: true },
+              distinct: ['telegramUserId'],
+              skip: skip,
+              take: batchSize
+            })
+            recipients.push(...batch)
+            hasMore = batch.length === batchSize
+            skip += batchSize
+          }
+        } catch (dbError) {
+          console.error('[Broadcast] Database query failed:', dbError)
+          await sendMessage(user.id, `❌ <b>Database Query Failed!</b>\n\nError: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`)
+          return
+        }
       }
+
       console.log('[Broadcast] Found recipients:', recipients.length)
+      await sendMessage(user.id, `✅ <b>Found ${recipients.length} Recipients</b>\n\nStarting to send messages...`)
 
       // Handle empty recipient list
       if (recipients.length === 0) {
