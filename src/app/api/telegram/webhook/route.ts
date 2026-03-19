@@ -1381,7 +1381,7 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
   const targetType = planType === 'all' ? 'all users' : `${planType} users`
   const filterType = activeOnly ? 'active subscribers only' : targetType
 
-  await sendMessage(user.id, `📢 <b>Starting Broadcast...</b>\n\n━━━━━━━━━━━━━━━━━━━\n\nTarget: ${filterType}\n\n<i>Processing in background. I will send you a summary when done!</i>`)
+  await sendMessage(user.id, `📢 <b>Starting Broadcast...</b>\n\n━━━━━━━━━━━━━━━━━━━\n\nTarget: ${filterType}\n\n<i>Processing in background. I will send you progress updates as messages are sent!</i>`)
 
   // 2. Set the lock SYNCHRONOUSLY before starting the background task
   isGlobalBroadcastRunning = true
@@ -1390,6 +1390,9 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
   // 3. Start the background process without awaiting the loop
   ;(async () => {
     try {
+      console.log('[Broadcast] Starting background broadcast process...')
+      console.log('[Broadcast] Config:', { planType, activeOnly })
+
       // Build query for recipients
       let whereClause: any = {}
       if (planType !== 'all') whereClause.planType = planType
@@ -1398,6 +1401,7 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
         whereClause.isRemoved = false
       }
 
+      console.log('[Broadcast] Querying recipients...')
       let recipients: { telegramUserId: string }[] = []
       if (planType === 'all' && !activeOnly) {
         recipients = await prisma.user.findMany({ select: { telegramUserId: true } })
@@ -1408,10 +1412,11 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
           distinct: ['telegramUserId']
         })
       }
+      console.log('[Broadcast] Found recipients:', recipients.length)
 
       // Handle empty recipient list
       if (recipients.length === 0) {
-        await sendMessage(user.id, `❌ No users match the specified criteria.`)
+        await sendMessage(user.id, `❌ <b>No Recipients Found!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\nTarget: ${filterType}\n\nNo users match these criteria. Try a different target.`)
         return
       }
 
@@ -1424,6 +1429,10 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
       let failedCount = 0
       let duplicateCount = 0
       const failedUsers: string[] = []
+      let processedCount = 0
+      const progressInterval = Math.max(10, Math.floor(recipients.length / 20)) // Send progress every ~5% or every 10 messages
+
+      await sendMessage(user.id, `📊 <b>Broadcast Started!</b>\n\nFound ${recipients.length} recipients\nSending ${recipients.length > progressInterval ? '(with progress updates)' : '...'}\n\nTarget: ${filterType}`)
 
       for (const recipient of recipients) {
         // Check for broadcast timeout (2 hours max)
@@ -1449,6 +1458,7 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
           continue
         }
 
+        console.log(`[Broadcast] Sending to user ${recipient.telegramUserId}...`)
         try {
           let sent = false
           if (buttonText && callbackData) {
@@ -1460,6 +1470,7 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
           }
 
           if (sent) {
+            console.log(`[Broadcast] ✓ Sent to user ${recipient.telegramUserId}`)
             successCount++
             // Log successful send to database
             try {
@@ -1469,6 +1480,7 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
               console.error(`Failed to log broadcast for user ${recipient.telegramUserId}:`, logError)
             }
           } else {
+            console.log(`[Broadcast] ✗ Failed to send to user ${recipient.telegramUserId} (sendMessage returned false)`)
             failedCount++
             failedUsers.push(recipient.telegramUserId)
           }
@@ -1482,20 +1494,32 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
           }
 
           // Handle other errors
+          console.log(`[Broadcast] ✗ Exception sending to user ${recipient.telegramUserId}:`, error)
           failedCount++
           failedUsers.push(recipient.telegramUserId)
           console.error(`[Broadcast] Failed to send to ${recipient.telegramUserId}:`, error)
+        }
+
+        processedCount++
+
+        // Send progress update at intervals
+        if (processedCount % progressInterval === 0 || processedCount === recipients.length) {
+          const percentage = Math.round((processedCount / recipients.length) * 100)
+          await sendMessage(user.id, `📊 <b>Broadcast Progress:</b>\n\nProcessed: ${processedCount}/${recipients.length} (${percentage}%)\n\n✅ Sent: ${successCount}\n❌ Failed: ${failedCount}\n⏭️ Skipped: ${duplicateCount}`)
         }
 
         // Rate limiting delay
         await new Promise(resolve => setTimeout(resolve, BROADCAST_CONFIG.RATE_LIMIT_MS))
       }
 
-      await sendMessage(user.id, `✅ <b>Broadcast Complete!</b>\n\n📊 <b>Stats:</b>\n• Successful: ${successCount}\n• Failed: ${failedCount}\n• Skipped (duplicate): ${duplicateCount}\n\n${failedUsers.length > 0 ? `❌ Failed users:\n${failedUsers.slice(0, 10).join('\n')}${failedUsers.length > 10 ? '\n...and more' : ''}` : ''}`)
+      await sendMessage(user.id, `✅ <b>Broadcast Complete!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n📊 <b>Final Stats:</b>\n• ✅ Successful: ${successCount}\n• ❌ Failed: ${failedCount}\n• ⏭️ Skipped (duplicate): ${duplicateCount}\n• 📤 Total processed: ${processedCount}\n\n${failedUsers.length > 0 ? `❌ Failed users:\n${failedUsers.slice(0, 10).join('\n')}${failedUsers.length > 10 ? '\n...and more' : ''}` : ''}`)
+      console.log('[Broadcast] Completed successfully')
     } catch (err) {
       console.error('[Broadcast Task] Error:', err)
-      await sendMessage(user.id, `❌ <b>Broadcast Error</b>\n\nAn error occurred: ${err instanceof Error ? err.message : 'Unknown error'}`)
+      console.error('[Broadcast Task] Error stack:', err instanceof Error ? err.stack : 'No stack trace')
+      await sendMessage(user.id, `❌ <b>Broadcast Error!</b>\n\nError: ${err instanceof Error ? err.message : 'Unknown error'}\n\nCheck server logs for details.`)
     } finally {
+      console.log('[Broadcast] Releasing lock')
       // Always release lock, even on error
       isGlobalBroadcastRunning = false
       shouldCancelBroadcast = false
