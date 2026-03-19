@@ -185,5 +185,4 @@ model BroadcastLog {
 
   @@unique([messageHash, telegramUserId])
   @@index([sentAt])
-  @@index([messageHash, telegramUserId])
 }
