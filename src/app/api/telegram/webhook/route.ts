@@ -1570,7 +1570,46 @@ async function handleBotStats(user: TelegramUser): Promise<void> {
 
     const revenueNaira = (totalRevenue._sum.amountKobo || 0) / 100
 
-    // 6. Get latest active subscribers (limit to 10 for readability)
+    // 7. Get users who joined today (since midnight)
+    const today = new Date()
+    today.setHours(0, 0, 0, 0)
+
+    const joinedTodayUsers = await prisma.user.findMany({
+      where: {
+        createdAt: { gte: today }
+      },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+      select: {
+        telegramName: true,
+        telegramUsername: true,
+        telegramUserId: true
+      }
+    })
+
+    const joinedTodayCount = await prisma.user.count({
+      where: {
+        createdAt: { gte: today }
+      }
+    })
+
+    // Format joined today display
+    let joinedTodayDisplay = `• Joined Today: <b>${joinedTodayCount}</b>`
+    if (joinedTodayCount > 0) {
+      const names = joinedTodayUsers.map(u => {
+        if (u.telegramUsername) return `@${u.telegramUsername}`
+        if (u.telegramName) return u.telegramName
+        return `<${u.telegramUserId}>`
+      })
+      const displayNames = names.join(', ')
+      joinedTodayDisplay += ` (${displayNames}`
+      if (joinedTodayCount > 10) {
+        joinedTodayDisplay += `... and ${joinedTodayCount - 10} more`
+      }
+      joinedTodayDisplay += ')'
+    }
+
+    // 8. Get latest active subscribers (limit to 10 for readability)
     const latestSubs = await prisma.subscription.findMany({
       where: {
         expiresAt: { gt: now },
@@ -1609,6 +1648,7 @@ async function handleBotStats(user: TelegramUser): Promise<void> {
 • Total Bot Users: <b>${totalUsers}</b>
 • Unique Subscribers: <b>${uniqueSubscribers.length}</b>
 • Non-paying Users: <b>${totalUsers - uniqueSubscribers.length}</b>
+${joinedTodayDisplay}
 
 💎 <b>Subscriptions:</b>
 • Active VIP Members: <b>${activeSubscribers}</b>
