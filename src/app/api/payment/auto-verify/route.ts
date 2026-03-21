@@ -180,6 +180,9 @@ Click the link to join the channel. The link can only be used once.
 
 Type /status anytime to check your subscription.`
 
+    // MT5 AUTO COPIER - DISABLED FOR NOW
+    // Preserved for potential future use
+    /*
     if (PLANS[planType].hasCopierAccess) {
       message += `
 
@@ -239,9 +242,6 @@ Create one here and get <b>$100 BONUS!</b>
 Or skip for now - you have access for your full 14 days!`
     }
 
-    await sendMessage(telegramId, message)
-    console.log(`Invite link sent to telegram user ${telegramId}`)
-
     // If Premium plan, set conversation state for MT5 setup
     if (PLANS[planType].hasCopierAccess) {
       console.log(`[MT5 Setup] Setting conversation state for auto-verified user ${telegramId}`)
@@ -251,6 +251,22 @@ Or skip for now - you have access for your full 14 days!`
       })
       console.log(`[MT5 Setup] Conversation state ready for user ${telegramId}`)
     }
+    */
+
+    await sendMessage(telegramId, message)
+    console.log(`Invite link sent to telegram user ${telegramId}`)
+
+    // MT5 Setup conversation state - DISABLED
+    /*
+    if (PLANS[planType].hasCopierAccess) {
+      console.log(`[MT5 Setup] Setting conversation state for auto-verified user ${telegramId}`)
+      await setConversationState(telegramId, {
+        step: 'account_number',
+        data: {}
+      })
+      console.log(`[MT5 Setup] Conversation state ready for user ${telegramId}`)
+    }
+    */
 
     return NextResponse.json({
       success: true,

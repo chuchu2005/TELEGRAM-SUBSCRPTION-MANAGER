@@ -354,53 +354,14 @@ ${statsSection}
 
 ━━━━━━━━━━━━━━━━━━━
 
-🤖 <b>🔥 WANT TO MAKE MONEY WHILE YOU SLEEP?</b>
+📈 <b>Why Choose Our VIP Signals?</b>
 
-━━━━━━━━━━━━━━━━━━━
-
-<b>📖 IMAGINE THIS:</b>
-
-You go to bed at night...
-You wake up in the morning...
-<b>YOUR ACCOUNT HAS MADE ₦45,000!</b> 💰
-
-<b>While you were SLEEPING, our Auto Copier Bot was:</b>
-✅ Watching our VIP signals 24/7
-✅ Copying winning trades AUTOMATICALLY
-✅ Making you money while you dream!
-
-<b>⚡ HOW IT WORKS (SIMPLE):</b>
-
-1️⃣ Bot connects to your MT5 trading account
-2️⃣ When we post "BUY GOLD NOW" in VIP channel
-3️⃣ Bot SEES it instantly (faster than humans!)
-4️⃣ Bot COPIES the trade to your account automatically
-5️⃣ You make the SAME profits we make!
-
-<b>💰 REAL RESULTS FROM REAL USERS:</b>
-
-📊 "I woke up to ₦45,000 profit - while sleeping!"
-📊 "Made ₦32,000 while I was at my 9-5 job!"
-📊 "Made ₦28,000 playing football with friends!"
-📊 "Made ₦67,000 in 2 days - didn't check my phone once!"
-
-<b>❌ WITHOUT BOT (HARD LIFE):</b>
-❌ Must stare at phone 24/7 (never sleep!)
-❌ Miss trades while eating, working, sleeping
-❌ Type slowly = bad prices = LESS MONEY
-❌ Get tired and give up = NO MONEY
-
-<b>✅ WITH BOT (EASY LIFE):</b>
-✅ Bot works while you sleep, eat, work, play
-✅ Never misses a trade - 24/7 coverage
-✅ Faster than humans = BEST prices = MORE MONEY
-✅ Zero effort - just check profits at end of day!
-
-<b>🎯 SO WHAT'S THE CATCH?</b>
-
-Only Bi-Weekly (₦17,000) and Monthly (₦35,000) plans include the Auto Copier Bot!
-
-Basic plan (₦10,000) = You copy trades yourself (no bot)
+✅ 96% win rate on Gold (XAUUSD)
+✅ 3-4 quality trades dropped daily
+✅ Clear Entry & Exit points provided
+✅ Professional trade analysis
+✅ Perfect for beginners & experts
+✅ Learn while you earn!
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -419,85 +380,17 @@ Basic plan (₦10,000) = You copy trades yourself (no bot)
 ├─ You copy trades yourself & LEARN trading
 └─ <b>Best way to start!</b>
 
-📊 <b>Bi-Weekly VIP + Copier</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s>(was ₦17,000)</s>' : ''}
+📊 <b>Bi-Weekly VIP</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s>(was ₦17,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
-├─ <b>🤖 INCLUDES AUTO COPIER BOT!</b>
-├─ Make money while you sleep!
+├─ <b>Save ₦3,000</b> vs Basic plan!
+├─ More time to practice & profit
 └─ <b>Great value!</b>
 
-📅 <b>Monthly VIP + Copier</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s>(was ₦35,000)</s>' : ''}
+📅 <b>Monthly VIP</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s>(was ₦35,000)</s>' : ''}
 ├─ <b>30 days</b> access to VIP signals
-├─ <b>🤖 INCLUDES AUTO COPIER BOT!</b>
-├─ Make money while you sleep!
-└─ <b>Best for serious traders!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>🔥 WHY CHOOSE BI-WEEKLY OR MONTHLY?</b>
-
-<b>Without Auto Copier (Basic Plan):</b>
-❌ Watch phone 24/7 or miss trades
-❌ Slow copying = bad prices
-❌ Stressful - always checking Telegram
-❌ Make LESS money
-
-<b>With Auto Copier (Bi-Weekly/Monthly):</b>
-✅ Bot watches 24/7 - never miss trades
-✅ Instant copying = BEST prices
-✅ Zero stress - just check profits later
-✅ Make MORE money automatically!
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>📋 Quick Start:</b>
-1️⃣ Send /pay to get payment link
-2️⃣ Complete payment securely
-3️⃣ Copy your reference & send to bot
-4️⃣ Receive invite link instantly!
-
-<b>Need help?</b> Send /help
-
-<b>Any issues?</b> Contact @pearsignals
-
-━━━━━━━━━━━━━━━━━━━
-
-<i>Type /pay to get started</i>
-
-💎 <b>Basic Plan</b> - ${trialEligible ? '₦5,000' : '₦10,000'} ${trialEligible ? '<s> (was ₦10,000)</s>' : ''}
-├─ <b>7 days</b> access to VIP signals
-├─ <b>LEARN while you earn!</b> Perfect for beginners
-├─ You copy trades yourself & understand how trading works
-└─ <b>Best way to start your trading journey!</b>
-
-📊 <b>Bi-Weekly VIP + Copier</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
-├─ <b>14 days</b> access to VIP signals
-├─ 🤖 <b>Includes AUTO COPIER BOT</b> - We copy trades FOR YOU!
-├─ Trades execute <b>instantly</b> on your MT5
-└─ Best value with auto copier!
-
-📅 <b>Monthly VIP + Copier</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
-├─ <b>30 days</b> access to VIP signals
-├─ 🤖 <b>Includes AUTO COPIER BOT</b> - We copy trades FOR YOU!
-├─ Trades execute <b>instantly</b> on your MT5
-└─ Best value - serious traders get auto copier!
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>🔥 Why Bi-Weekly & Monthly Plans Are BEST:</b>
-
-<b>With Basic Plan (Manual Only):</b>
-❌ You must watch phone 24/7
-❌ You might miss trades while sleeping/busy
-❌ Manual copying = slow entries = lost profits
-❌ Stressful - always checking Telegram
-
-<b>With Bi-Weekly/Monthly Plans (Auto Copier Included):</b>
-✅ Trades copied <b>automatically</b> to your MT5
-✅ <b>Instant execution</b> = better entry prices
-✅ <b>Sleep peacefully</b> - bot works while you rest
-✅ <b>Phone data OFF?</b> No problem!
-✅ <b>At work?</b> Bot keeps trading!
-✅ <b>Zero stress</b> - just check profits at end of day
+├─ <b>Save ₦25,000</b> vs Basic plan!
+├─ Best value for serious traders
+└─ <b>Maximum savings!</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -515,7 +408,7 @@ Basic plan (₦10,000) = You copy trades yourself (no bot)
 
 <i>Type /pay to get started</i>`
 
-  // Send first message (FOMO + Auto Copier Bot explanation)
+  // Send first message (welcome + VIP signals explanation)
   await sendMessage(user.id, message)
 
   // Small delay to ensure order
@@ -531,10 +424,10 @@ Basic plan (₦10,000) = You copy trades yourself (no bot)
         { text: '💎 Basic Plan - ₦10,000', callback_data: 'pay_basic' }
       ],
       [
-        { text: '📊 Bi-Weekly + Bot copier - ₦17,000', callback_data: 'pay_biweekly' }
+        { text: '📊 Bi-Weekly VIP - ₦17,000', callback_data: 'pay_biweekly' }
       ],
       [
-        { text: '📅 Monthly + Bot copier - ₦35,000', callback_data: 'pay_monthly' }
+        { text: '📅 Monthly VIP - ₦35,000', callback_data: 'pay_monthly' }
       ]
     ]
   })
@@ -654,23 +547,10 @@ async function handleHelp(user: TelegramUser): Promise<void> {
 Send the command: /pay
 
 <b>Step 2: Choose Your Plan</b>
-💎 Basic (₦10,000) - 7 days, manual copying
-📊 Bi-Weekly (₦17,000) - 14 days, manual copying
-📅 Monthly (₦35,000) - 30 days, manual copying
-👑 <b>Premium (₦22,000)</b> - 14 days + <b>AUTO COPIER BOT</b> ⭐
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>🔥 Why Choose Premium?</b>
-
-<i>"I was missing trades while sleeping. With Premium Auto Copier, I woke up to ₦45,000 profit!"</i>
-
-<b>Premium Benefits:</b>
-✅ Trades copied <b>automatically</b> to your MT5
-✅ <b>Works 24/7</b> - even when phone is OFF
-✅ <b>Instant execution</b> = better prices
-✅ <b>Zero effort</b> - make money while you sleep
-✅ Perfect for busy people & 9-5 workers
+💎 Basic (₦10,000) - 7 days
+📊 Bi-Weekly (₦17,000) - 14 days (Save ₦3,000!)
+📅 Monthly (₦35,000) - 30 days (Save ₦25,000!)
+🎁 Promo (₦3,000) - 7 days (Limited time!)
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -686,7 +566,7 @@ Send the command: /pay
 • Send: /verify_basic YOUR_REFERENCE
 • Or: /verify_biweekly YOUR_REFERENCE
 • Or: /verify_monthly YOUR_REFERENCE
-• Or: /verify_premium YOUR_REFERENCE
+• Or: /verify_promo YOUR_REFERENCE
 • Bot verifies instantly → sends invite link
 
 ━━━━━━━━━━━━━━━━━━━
@@ -703,11 +583,17 @@ Share your link → friend pays → <b>you get the same plan FREE!</b>
 
 <b>❓ Frequently Asked Questions</b>
 
-<i>Q: What is the Auto Copier Bot?</i>
-A: It automatically copies every trade from our VIP channel to your MT5 account instantly. No manual work needed!
+<i>Q: How do I receive the signals?</i>
+A: Signals are posted in our VIP channel with clear Entry & Exit points.
 
-<i>Q: Does it work when my phone is off?</i>
-A: YES! The bot runs on our server 24/7, so trades copy to your MT5 even if your phone is off or no data.
+<i>Q: What's the win rate?</i>
+A: 96% win rate on Gold (XAUUSD) trades.
+
+<i>Q: How many signals per day?</i>
+A: 3-4 quality trades dropped daily.
+
+<i>Q: Can beginners use this?</i>
+A: YES! We provide clear instructions. Perfect for learning.
 
 <i>Q: What if I don't have a reference?</i>
 A: Make sure you copy it from the Paystack success page after payment.
@@ -4888,15 +4774,58 @@ Or send /cancel to exit.`
         break
 
       case '/mt5setup':
-        await handleMt5Setup(from)
+        // MT5 Auto Copier - DISABLED FOR NOW
+        await sendMessage(from.id, `⚠️ <b>Feature Currently Unavailable</b>
+
+The MT5 Auto Copier feature is not available at this time.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>💡 What You Can Do:</b>
+✅ Join our VIP signals channel
+✅ Copy trades manually at Entry & Exit points
+✅ Learn trading strategies
+✅ Make profits with 96% win rate!
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Type /help for available commands</i>`)
         break
 
       case '/settings':
-        await handleSettings(from)
+        // Copier Settings - DISABLED FOR NOW
+        await sendMessage(from.id, `⚠️ <b>Feature Currently Unavailable</b>
+
+Copier settings are not available at this time.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>💡 What You Can Do:</b>
+✅ Use /status to check your subscription
+✅ Use /pay to upgrade your plan
+✅ Copy trades manually in VIP channel
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Type /help for available commands</i>`)
         break
 
       case '/mystats':
-        await handleMyStats(from)
+        // Copier Stats - DISABLED FOR NOW
+        await sendMessage(from.id, `⚠️ <b>Feature Currently Unavailable</b>
+
+Copier statistics are not available at this time.
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>💡 What You Can Do:</b>
+✅ Use /status to check your subscription
+✅ View your signals in VIP channel
+✅ Track your profits manually
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Type /help for available commands</i>`)
         break
 
       case '/skip':

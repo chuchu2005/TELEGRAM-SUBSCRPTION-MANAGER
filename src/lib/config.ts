@@ -8,16 +8,16 @@ export const PLANS = {
     hasCopierAccess: false
   },
   biweekly: {
-    name: 'Bi-Weekly VIP + Copier',
+    name: 'Bi-Weekly VIP',
     amountKobo: 1700000,  // NGN 17,000
     durationDays: 14,
-    hasCopierAccess: true
+    hasCopierAccess: false  // Disabled for now, keep for future
   },
   monthly: {
-    name: 'Monthly VIP + Copier',
+    name: 'Monthly VIP',
     amountKobo: 3500000,  // NGN 35,000
     durationDays: 30,
-    hasCopierAccess: true
+    hasCopierAccess: false  // Disabled for now, keep for future
   },
   promo: {
     name: 'Promo VIP',
