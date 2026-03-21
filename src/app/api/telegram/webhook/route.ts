@@ -536,10 +536,10 @@ Basic plan (₦10,000) = You copy trades yourself (no bot)
         { text: '💎 Basic Plan - ₦10,000', callback_data: 'pay_basic' }
       ],
       [
-        { text: '📊 Bi-Weekly + Copier - ₦17,000', callback_data: 'pay_biweekly' }
+        { text: '📊 Bi-Weekly + Bot copier - ₦17,000', callback_data: 'pay_biweekly' }
       ],
       [
-        { text: '📅 Monthly + Copier - ₦35,000', callback_data: 'pay_monthly' }
+        { text: '📅 Monthly + Bot copier - ₦35,000', callback_data: 'pay_monthly' }
       ]
     ]
   })
@@ -4275,6 +4275,22 @@ Or send /cancel to exit.`
 
       if (data === 'promo_copier_24hr') {
         await handleCopierPromoPay(from)
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle quick pay button clicks from start message
+      if (data === 'pay_basic') {
+        await handleQuickPay(from, 'basic')
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'pay_biweekly') {
+        await handleQuickPay(from, 'biweekly')
+        return NextResponse.json({ ok: true })
+      }
+
+      if (data === 'pay_monthly') {
+        await handleQuickPay(from, 'monthly')
         return NextResponse.json({ ok: true })
       }
 
