@@ -351,42 +351,140 @@ ${statsSection}
 
 ━━━━━━━━━━━━━━━━━━━
 
+🤖 <b>MEET YOUR NEW MONEY-MAKING ROBOT!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>📖 HOW IT WORKS (SUPER SIMPLE):</b>
+
+Imagine you have a friend named "Robot" who:
+
+1️⃣ <b>WATCHES</b> our VIP signals channel 24 hours a day
+2️⃣ <b>SEES</b> when we say "BUY NOW" or "SELL NOW"
+3️⃣ <b>COPIES</b> that trade to your account - FAST! (faster than you can click!)
+4️⃣ <b>MAKES YOU MONEY</b> - while you sleep, eat, play, work, or do NOTHING!
+
+<b>🔧 THE TECHNICAL PART (STILL SIMPLE):</b>
+
+🔗 The bot connects to your MT5 trading account (like plugging in a cable)
+📱 When we send a trade signal in our VIP channel
+🤖 The bot SEES it instantly (like reading a text message)
+⚡ The bot COPIES the trade to your account automatically (like copy-paste on a computer)
+💰 Your account makes the SAME profit as our trades!
+🔄 It repeats this ALL DAY - EVERY DAY!
+
+<b>✅ EXAMPLE:</b>
+
+<b>WE POST:</b> "Buy GOLD now at $2000"
+<b>YOUR BOT SEES:</b> "Buy GOLD now at $2000"
+<b>YOUR BOT DOES:</b> Automatically buys GOLD for you at $2000
+<b>YOU MAKE:</b> Profit when GOLD goes up! 💰
+
+<b>ALL WITHOUT YOU TOUCHING YOUR PHONE!</b>
+
+<b>❌ WITHOUT BOT (HARD WAY):</b>
+❌ You must stare at your phone 24/7
+❌ You might be sleeping when we send a signal
+❌ You might be eating when we send a signal
+❌ You might be at work when we send a signal
+❌ You type slowly = bad price = LESS MONEY
+❌ You get tired and miss trades = NO MONEY
+
+<b>✅ WITH BOT (EASY WAY):</b>
+✅ Bot never sleeps - works 24/7
+✅ Bot sees every signal instantly
+✅ Bot types faster than any human
+✅ Bot gets the BEST prices = MORE MONEY
+✅ You make money while doing NOTHING!
+
+<b>💰 REAL RESULTS FROM USERS:</b>
+
+📊 "I made ₦45,000 while sleeping!"
+📊 "I was at work, bot made me ₦32,000!"
+📊 "I was playing football, bot made me ₦28,000!"
+📊 "I didn't check my phone for 2 days, made ₦67,000!"
+
+<b>🎯 THE BOTTOM LINE:</b>
+
+<b>📊 BASIC PLAN (₦10,000) - PERFECT FOR BEGINNERS!</b>
+• You copy trades yourself - <b>LEARN while you earn!</b>
+• Best for <b>new traders</b> who want to understand how trading works
+• You control when to enter/exit trades
+• <b>Great way to learn</b> - become a better trader!
+• You decide when to trade - no pressure
+• <b>Start your trading journey the right way!</b>
+
+<b>🤖 BI-WEEKLY or MONTHLY PLAN - PERFECT FOR BUSY PEOPLE!</b>
+• Robot copies trades automatically - <b>sit back & relax!</b>
+• Best for <b>experienced traders</b> or people with busy schedules
+• Never miss a trade - works 24/7
+• <b>Make money while you sleep, work, or play!</b>
+• Bot handles everything - zero stress
+• <b>Automated profits on autopilot!</b>
+
+<b>🎓 BOTH PLANS ARE GREAT - CHOOSE WHAT FITS YOUR LIFESTYLE:</b>
+
+<b>Choose BASIC if you:</b>
+✅ Are new to trading and want to learn
+✅ Have time to check your phone during the day
+✅ Want to understand how trading works
+✅ Enjoy being hands-on with your investments
+
+<b>Choose BI-WEEKLY/MONTHLY if you:</b>
+✅ Are busy with work, school, or business
+✅ Can't check your phone 24/7
+✅ Want automated profits while you sleep
+✅ Prefer a hands-free approach
+
+<b>💡 THERE'S NO WRONG CHOICE - BOTH MAKE MONEY!</b>
+
+The question is: <b>Do you want to LEARN (Basic) or AUTOMATE (Bi-Weekly/Monthly)?</b>
+
+<b>🚀 Pick the path that fits YOUR life!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>⚠️ IMPORTANT:</b>
+
+The Auto Copier Bot is <b>ONLY included</b> in:
+• 📊 Bi-Weekly VIP + Copier (₦17,000)
+• 📅 Monthly VIP + Copier (₦35,000)
+
+<b>Basic plan (₦10,000) = NO ROBOT (Perfect for learning!)</b>
+
+━━━━━━━━━━━━━━━━━━━
+
 Choose a plan to get instant access to our VIP community:
 
 💎 <b>Basic Plan</b> - ${trialEligible ? '₦5,000' : '₦10,000'} ${trialEligible ? '<s> (was ₦10,000)</s>' : ''}
 ├─ <b>7 days</b> access to VIP signals
-├─ You copy trades manually
-└─ Perfect for trying out
+├─ <b>LEARN while you earn!</b> Perfect for beginners
+├─ You copy trades yourself & understand how trading works
+└─ <b>Best way to start your trading journey!</b>
 
-📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
+📊 <b>Bi-Weekly VIP + Copier</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
-├─ You copy trades manually
-└─ Great balance of price & duration
-
-📅 <b>Monthly Plan</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
-├─ <b>30 days</b> access to VIP signals
-├─ You copy trades manually
-└─ Best value for serious traders
-
-👑 <b>Premium Plan - AUTO COPIER</b> - ${trialEligible ? '₦11,000' : '₦22,000'} ⭐ ${trialEligible ? '<s> (was ₦22,000)</s>' : ''}
-├─ <b>14 days</b> access to VIP signals
-├─ 🤖 <b>AUTO COPIER BOT</b> - We copy trades FOR YOU!
+├─ 🤖 <b>Includes AUTO COPIER BOT</b> - We copy trades FOR YOU!
 ├─ Trades execute <b>instantly</b> on your MT5
-├─ <b>Works 24/7</b> even when your phone is OFF
-├─ <b>Zero effort</b> - no manual copying needed
-└─ Make money while you sleep! 💰
+└─ Best value with auto copier!
+
+📅 <b>Monthly VIP + Copier</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
+├─ <b>30 days</b> access to VIP signals
+├─ 🤖 <b>Includes AUTO COPIER BOT</b> - We copy trades FOR YOU!
+├─ Trades execute <b>instantly</b> on your MT5
+└─ Best value - serious traders get auto copier!
 
 ━━━━━━━━━━━━━━━━━━━
 
-<b>🔥 Why Premium is BEST:</b>
+<b>🔥 Why Bi-Weekly & Monthly Plans Are BEST:</b>
 
-<b>With Manual Plans (Basic/Bi-Weekly/Monthly):</b>
+<b>With Basic Plan (Manual Only):</b>
 ❌ You must watch phone 24/7
 ❌ You might miss trades while sleeping/busy
 ❌ Manual copying = slow entries = lost profits
 ❌ Stressful - always checking Telegram
 
-<b>With Premium Auto Copier:</b>
+<b>With Bi-Weekly/Monthly Plans (Auto Copier Included):</b>
 ✅ Trades copied <b>automatically</b> to your MT5
 ✅ <b>Instant execution</b> = better entry prices
 ✅ <b>Sleep peacefully</b> - bot works while you rest
@@ -721,23 +819,8 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
     const monthlyData = await monthlyResponse.json()
     console.log('Monthly payment link response:', monthlyData)
 
-    // Create payment link for Premium plan
-    const premiumResponse = await fetch(`${APP_URL}/api/payment/link`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        telegramId: telegramUserId,
-        telegramUsername,
-        planType: 'premium',
-        email // Pass user's email
-      })
-    })
-
-    const premiumData = await premiumResponse.json()
-    console.log('Premium payment link response:', premiumData)
-
-    if (!basicData.success || !biweeklyData.success || !monthlyData.success || !premiumData.success) {
-      console.error('Payment link generation failed:', { basicData, biweeklyData, monthlyData, premiumData })
+    if (!basicData.success || !biweeklyData.success || !monthlyData.success) {
+      console.error('Payment link generation failed:', { basicData, biweeklyData, monthlyData })
       await sendMessage(user.id, '❌ Failed to generate payment links. Please try again later.\n\nSend /pay to start over.')
       return
     }
@@ -761,24 +844,18 @@ ${TRIAL_DISCOUNT.discountMessage}
 
 💎 <b>Basic Plan</b> - ${trialEligible ? '₦5,000' : '₦10,000'}
 ├─ <b>7 days</b> access to VIP signals
-├─ You copy trades manually
-└─ For trying out
+├─ <b>LEARN while you earn!</b> Perfect for beginners
+└─ You copy trades yourself & understand trading
 
-📊 <b>Bi-Weekly Plan</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
+📊 <b>Bi-Weekly Plan + Copier</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
-├─ You copy trades manually
-└─ Great balance of price & duration
+├─ 🤖 <b>Includes AUTO COPIER BOT</b> - We copy trades FOR YOU!
+└─ Great balance of price & automation
 
-📅 <b>Monthly Plan</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
+📅 <b>Monthly Plan + Copier</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
 ├─ <b>30 days</b> access to VIP signals
-├─ You copy trades manually
-└─ Best for consistent trading
-
-👑 <b>Premium - AUTO COPIER</b> - ${trialEligible ? '₦11,000' : '₦22,000'} ⭐ ${trialEligible ? '<s> (was ₦22,000)</s>' : ''}
-├─ <b>14 days</b> VIP signals + <b>AUTO COPIER BOT</b>
-├─ 🤖 Trades copy <b>automatically</b> to your MT5
-├─ 💰 Make money while you sleep
-├─ 📴 Works even when phone is OFF
+├─ 🤖 <b>Includes AUTO COPIER BOT</b> - We copy trades FOR YOU!
+└─ Best value - automated profits for serious traders
 ├─ ⚡ <b>Instant execution</b> - never miss a trade
 └─ 🚀 <b>Zero effort</b> - fully automated!
 
@@ -812,9 +889,8 @@ Then send: /verify_basic REFERENCE
 Or send /pay to start over
 
 💎 Pay ${trialEligible ? '₦5,000' : '₦10,000'} (Basic - 7 days) ${trialEligible ? '🔥 50% OFF!' : ''}
-📊 Pay ${trialEligible ? '₦8,500' : '₦17,000'} (Bi-Weekly - 14 days) ${trialEligible ? '🔥 50% OFF!' : ''}
-📅 Pay ${trialEligible ? '₦17,500' : '₦35,000'} (Monthly - 30 days) ${trialEligible ? '🔥 50% OFF!' : ''}
-👑 Pay ${trialEligible ? '₦11,000' : '₦22,000'} (Premium - 14 days + Auto Copier) ⭐ ${trialEligible ? '🔥 50% OFF!' : ''}
+📊 Pay ${trialEligible ? '₦8,500' : '₦17,000'} (Bi-Weekly + Copier - 14 days) ${trialEligible ? '🔥 50% OFF!' : ''}
+📅 Pay ${trialEligible ? '₦17,500' : '₦35,000'} (Monthly + Copier - 30 days) ${trialEligible ? '🔥 50% OFF!' : ''}
 
 Still have questions? Send /help`
 
@@ -836,22 +912,16 @@ Still have questions? Send /help`
               { text: '✅ Verify Basic Payment', callback_data: 'verify_basic' }
             ],
             [
-              { text: `📊 Pay ${trialEligible ? '₦8,500 (was ₦17,000)' : '₦17,000'} - Bi-Weekly`, url: biweeklyData.authorizationUrl }
+              { text: `📊 Pay ${trialEligible ? '₦8,500 (was ₦17,000)' : '₦17,000'} - Bi-Weekly + Copier`, url: biweeklyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Bi-Weekly Payment', callback_data: 'verify_biweekly' }
             ],
             [
-              { text: `📅 Pay ${trialEligible ? '₦17,500 (was ₦35,000)' : '₦35,000'} - Monthly`, url: monthlyData.authorizationUrl }
+              { text: `📅 Pay ${trialEligible ? '₦17,500 (was ₦35,000)' : '₦35,000'} - Monthly + Copier`, url: monthlyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Monthly Payment', callback_data: 'verify_monthly' }
-            ],
-            [
-              { text: `👑 Pay ${trialEligible ? '₦11,000 (was ₦22,000)' : '₦22,000'} - Premium ⭐`, url: premiumData.authorizationUrl }
-            ],
-            [
-              { text: '✅ Verify Premium Payment', callback_data: 'verify_premium' }
             ]
           ]
         }
@@ -1068,116 +1138,6 @@ async function handleBroadcastActive(user: TelegramUser, args: string[]): Promis
 }
 
 /**
- * Handle /broadcast_premium command - Admin only
- * Sends message to premium users only
- * Usage: /broadcast_premium Your message here
- */
-async function handleBroadcastPremium(user: TelegramUser, args: string[]): Promise<void> {
-  await sendBroadcast(user, args, 'premium', false)
-}
-
-/**
- * Handle /broadcast_copier_promo command - Admin only
- * Sends copier promo with payment button to ALL users
- * Usage: /broadcast_copier_promo
- */
-async function handleCopierPromoBroadcast(user: TelegramUser): Promise<void> {
-  // Check if user is admin
-  if (user.id !== ADMIN_ID) {
-    await sendMessage(user.id, '❌ Only admin can use this command.')
-    return
-  }
-
-  // Prevent duplicate broadcasts
-  if (isGlobalBroadcastRunning) {
-    await sendMessage(user.id, '⚠️ Broadcast already running. Please wait for it to complete.')
-    return
-  }
-
-  isGlobalBroadcastRunning = true
-
-  const message = `🔥 <b>LIMITED TIME OFFER - 24 HOURS ONLY!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-🎯 <b>Get the Auto Copier Bot for ₦15,000!</b>
-
-Regular Price: <s>₦22,000</s>
-<b>YOUR PRICE: ₦15,000</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>🚀 How It Works:</b>
-
-✅ <b>Automated bot that trades for you</b> - No manual work needed!
-✅ <b>It analyzes trades and places them for you</b> as well
-✅ <b>Same trades</b> from the VIP signals channel
-✅ <b>96% win rate</b> on all trades
-✅ <b>Works 24/7</b> - even when your phone is OFF
-✅ <b>Full 14 days</b> of automated trading
-
-━━━━━━━━━━━━━━━━━━━
-
-⚠️ <b>Offer expires in 24 hours!</b> After that, price returns to ₦22,000.
-
-👇 Tap the button below to get your payment link now!`
-
-  const replyMarkup = {
-    inline_keyboard: [[
-      { text: '🔥 GET ₦15,000 PROMO (Auto Copier)', callback_data: 'promo_copier_24hr' }
-    ]]
-  }
-
-  await sendMessage(user.id, `📢 <b>Broadcasting copier promo...</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-${message}
-
-━━━━━━━━━━━━━━━━━━━
-
-<i>Sending to all users...</i>
-<i>I'll send you a summary when done!</i>`)
-
-  // Get ALL users (send to everyone, including previous buyers)
-  const allUsers = await prisma.user.findMany({
-    select: { telegramUserId: true }
-  })
-  console.log(`[Copier Promo Broadcast] Targeting ALL users from User table: ${allUsers.length} recipients`)
-
-  let successCount = 0
-  let failedCount = 0
-  const failedUsers: string[] = []
-
-  for (const recipient of allUsers) {
-    try {
-      const sent = await sendMessageWithKeyboard(recipient.telegramUserId, message, replyMarkup)
-      if (sent) {
-        successCount++
-      } else {
-        failedCount++
-        failedUsers.push(recipient.telegramUserId.toString())
-      }
-    } catch (error) {
-      failedCount++
-      console.error(`Failed to send to ${recipient.telegramUserId}:`, error)
-    }
-
-    await new Promise(resolve => setTimeout(resolve, 100))
-  }
-
-  await sendMessage(user.id, `✅ <b>Copier Promo Broadcast Complete!</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-📊 <b>Stats:</b>
-• ✅ Sent successfully: ${successCount}
-• ❌ Failed: ${failedCount}
-
-━━━━━━━━━━━━━━━━━━━`)
-}
-
-/**
  * Handle /test_copier_promo command - Admin only
  * Sends copier promo to admin only (for testing)
  * Usage: /test_copier_promo
@@ -1340,7 +1300,7 @@ Perfect for:
 /**
  * Shared broadcast function
  */
-async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basic' | 'biweekly' | 'monthly' | 'premium' | 'all', activeOnly: boolean): Promise<void> {
+async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basic' | 'biweekly' | 'monthly' | 'all', activeOnly: boolean): Promise<void> {
   // Check if user is admin
   if (user.id !== ADMIN_ID) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
@@ -1775,13 +1735,6 @@ async function handleVerifyPromo(user: TelegramUser, reference: string): Promise
 }
 
 /**
- * Handle /verify_premium command
- */
-async function handleVerifyPremium(user: TelegramUser, reference: string): Promise<void> {
-  await handleVerify(user, reference, 'premium')
-}
-
-/**
  * Handle /promo command
  */
 async function handlePromo(from: TelegramUser, args: string[]): Promise<void> {
@@ -1990,7 +1943,7 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
         return
       }
 
-      const plan: PlanType = promoCode === 'VIP' ? 'basic' : 'premium'
+      const plan: PlanType = promoCode === 'VIP' ? 'basic' : 'biweekly'
       const expiresAt = calculateExpiryDate(plan, currentExpiry)
 
       const newSubscription = await prisma.subscription.create({
@@ -2001,7 +1954,7 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
           paystackRef: promoCode,
           amountKobo: 0,
           planType: plan,
-          hasCopierAccess: plan === 'premium',
+          hasCopierAccess: plan === 'biweekly',
           startedAt: new Date(),
           expiresAt: expiresAt,
           inviteLinkUsed: lastActiveSub?.inviteLinkUsed || ''
@@ -2009,7 +1962,7 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
       })
 
       // Migrate MT5 setup from old active sub if renewing a copier plan
-      if (plan === 'premium') {
+      if (plan === 'biweekly') {
         const activeMt5 = await prisma.mt5Setup.findFirst({
           where: { subscription: { telegramUserId: userId, isRemoved: false, id: { not: newSubscription.id } } },
           orderBy: { createdAt: 'desc' }
@@ -2222,11 +2175,10 @@ async function handleUnknown(user: TelegramUser): Promise<void> {
 /verify_basic REF - Verify Basic plan payment
 /verify_biweekly REF - Verify Bi-Weekly plan payment
 /verify_monthly REF - Verify Monthly plan payment
-/verify_premium REF - Verify Premium plan payment
 /status - Check your subscription
-/mt5setup - Setup MT5 copier (Premium only)
-/settings - Configure copier settings (Premium only)
-/mystats - View copier status (Premium only)
+/mt5setup - Setup MT5 copier (Bi-Weekly/Monthly only)
+/settings - Configure copier settings (Bi-Weekly/Monthly only)
+/mystats - View copier status (Bi-Weekly/Monthly only)
 /help - Get help`)
 }
 
@@ -2272,14 +2224,14 @@ async function handleMt5Setup(user: TelegramUser): Promise<void> {
 
 ━━━━━━━━━━━━━━━━━━━
 
-Your Premium subscription expired ${daysSinceExpiry === 0 ? 'today' : daysSinceExpiry === 1 ? 'yesterday' : `${daysSinceExpiry} days ago`}.
+Your subscription expired ${daysSinceExpiry === 0 ? 'today' : daysSinceExpiry === 1 ? 'yesterday' : `${daysSinceExpiry} days ago`}.
 
-The MT5 Auto Copier is only available for active Premium subscribers.
+The MT5 Auto Copier is only available for active Bi-Weekly/Monthly subscribers.
 
 ━━━━━━━━━━━━━━━━━━━
 
 <b>Want to renew?</b>
-Type /pay to see our Premium plan (₦22,000)
+Type /pay to see our Bi-Weekly (₦17,000) or Monthly (₦35,000) plans
 
 Your subscription will be extended from today!`)
     } else {
@@ -2289,12 +2241,12 @@ Your subscription will be extended from today!`)
 
 ━━━━━━━━━━━━━━━━━━━
 
-The MT5 Auto Copier is only available for Premium subscribers.
+The MT5 Auto Copier is only available for Bi-Weekly/Monthly subscribers.
 
 ━━━━━━━━━━━━━━━━━━━
 
 <b>Want to upgrade?</b>
-Type /pay to see our Premium plan (₦22,000)`)
+Type /pay to see our Bi-Weekly (₦17,000) or Monthly (₦35,000) plans`)
     }
     return
   }
@@ -2832,9 +2784,8 @@ What plan type?
     case 'plan_type': {
       const planMap: Record<string, PlanType> = {
         '1': 'basic',
-        '2': 'premium',
-        '3': 'biweekly',
-        '4': 'monthly'
+        '2': 'biweekly',
+        '3': 'monthly'
       }
 
       const planType = planMap[trimmedText]
@@ -4075,7 +4026,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Answer the callback query to remove the loading state - use context-appropriate text
-      const isVerifyCallback = data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo' || data === 'verify_premium' || data === 'verify_copier24hr'
+      const isVerifyCallback = data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo'
 
       const isCheckJoined = data === 'check_joined'
 
@@ -4087,8 +4038,8 @@ export async function POST(request: NextRequest) {
       }
 
       // Handle verify payment button clicks
-      if (data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo' || data === 'verify_premium' || data === 'verify_copier24hr') {
-        const planType: PlanType = data === 'verify_basic' ? 'basic' : data === 'verify_biweekly' ? 'biweekly' : data === 'verify_monthly' ? 'monthly' : data === 'verify_promo' ? 'promo' : data === 'verify_copier24hr' ? 'copier24hr' : 'premium'
+      if (data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo') {
+        const planType: PlanType = data === 'verify_basic' ? 'basic' : data === 'verify_biweekly' ? 'biweekly' : data === 'verify_monthly' ? 'monthly' : 'promo'
 
         // Mark user as waiting for reference
         pendingVerificationUsers.set(userId, planType)
@@ -4096,11 +4047,9 @@ export async function POST(request: NextRequest) {
         // Send photo with instructions
         const planNames = {
           basic: 'Basic (₦10,000)',
-          biweekly: 'Bi-Weekly (₦17,000)',
-          monthly: 'Monthly (₦35,000)',
-          promo: 'Promo (₦3,000)',
-          premium: 'Premium (₦22,000)',
-          copier24hr: 'Copier 24Hr Promo (₦15,000)'
+          biweekly: 'Bi-Weekly + Copier (₦17,000)',
+          monthly: 'Monthly + Copier (₦35,000)',
+          promo: 'Promo (₦3,000)'
         }
         const planName = planNames[planType]
         const caption = `✅ <b>Verifying ${planName} Payment</b>
@@ -4679,42 +4628,6 @@ Or send /cancel to exit.`
         await handlePromo(from, args)
         break
 
-      case '/verify_premium':
-        // If no reference provided, show instructions
-        if (!args[0]) {
-          pendingVerificationUsers.set(userId, 'premium')
-
-          const caption = `✅ <b>Verifying Premium (₦22,000) Payment</b>
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>⚠️ IMPORTANT:</b>
-<i>ONLY paste the reference code below!</i>
-
-<i>The reference is just letters and numbers (no spaces, no "REF:" prefix)</i>
-
-━━━━━━━━━━━━━━━━━━━
-
-Look at the image above 👆 to see where to find your reference in the Paystack email.
-
-━━━━━━━━━━━━━━━━━━━
-
-❌ Don't send: /verify_premium REF123
-❌ Don't send: REF: iby0ro0awd
-✅ Just send: iby0ro0awd
-
-━━━━━━━━━━━━━━━━━━━
-
-Just paste the reference number below and I'll verify instantly!
-
-Or send /cancel to exit.`
-
-          await sendPhoto(from.id, REFERENCE_IMAGE_ID, caption)
-        } else {
-          await handleVerifyPremium(from, args[0])
-        }
-        break
-
       case '/broadcast':
         await handleBroadcast(from, args)
         break
@@ -4731,10 +4644,6 @@ Or send /cancel to exit.`
         await handleBroadcastActive(from, args)
         break
 
-      case '/broadcast_premium':
-        await handleBroadcastPremium(from, args)
-        break
-
       case '/broadcast_promo':
         await handleBroadcastPromo(from)
         break
@@ -4749,10 +4658,6 @@ Or send /cancel to exit.`
 
       case '/list_promos':
         await handleListPromos(from)
-        break
-
-      case '/broadcast_copier_promo':
-        await handleCopierPromoBroadcast(from)
         break
 
       case '/test_copier_promo':
