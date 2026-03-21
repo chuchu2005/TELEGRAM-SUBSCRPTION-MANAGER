@@ -198,7 +198,7 @@ Your exclusive referral code: <b>${referralCode}</b>
 
 <b>1. Direct Plan Match 💎</b>
 When someone joins using your link and pays for <b>ANY</b> plan, you instantly get the <b>EXACT SAME PLAN</b> added to your account for <b>FREE!</b>
-<i>Example: Your friend buys a ₦35,000 Monthly plan. BOOM! You instantly get 30 days of VIP Access completely free!</i>
+<i>Example: Your friend buys a ₦18,000 Monthly plan. BOOM! You instantly get 30 days of VIP Access completely free!</i>
 
 <b>2. The 20-Referral Milestone 🏆</b>
 Every 20 successful referrals(PEOPLE WHO ONLY CLICKED YOUR REFERRAL LINK ONLY) you bring in, we will automatically reward you with a <b>FREE 7-Day Basic Plan</b> on top of your existing rewards!
@@ -374,22 +374,22 @@ ${statsSection}
 
 ━━━━━━━━━━━━━━━━━━━
 
-💎 <b>Basic Plan</b> - ${trialEligible ? '₦5,000' : '₦10,000'} ${trialEligible ? '<s>(was ₦10,000)</s>' : ''}
+💎 <b>Basic Plan</b> - ₦5,000
 ├─ <b>7 days</b> access to VIP signals
 ├─ <b>🎓 PERFECT FOR BEGINNERS!</b>
 ├─ You copy trades yourself & LEARN trading
 └─ <b>Best way to start!</b>
 
-📊 <b>Bi-Weekly VIP</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s>(was ₦17,000)</s>' : ''}
+📊 <b>Bi-Weekly VIP</b> - ${trialEligible ? '₦4,500' : '₦9,000'} ${trialEligible ? '<s>(was ₦9,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
-├─ <b>Save ₦3,000</b> vs Basic plan!
+├─ <b>Better value than Basic!</b>
 ├─ More time to practice & profit
 └─ <b>Great value!</b>
 
-📅 <b>Monthly VIP</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s>(was ₦35,000)</s>' : ''}
+📅 <b>Monthly VIP</b> - ${trialEligible ? '₦9,000' : '₦18,000'} ${trialEligible ? '<s>(was ₦18,000)</s>' : ''}
 ├─ <b>30 days</b> access to VIP signals
-├─ <b>Save ₦25,000</b> vs Basic plan!
-├─ Best value for serious traders
+├─ <b>Best value - serious traders!</b>
+├─ Maximum time to profit
 └─ <b>Maximum savings!</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -421,13 +421,13 @@ ${statsSection}
         { text: '🎁 Join for FREE for 24 hrs', callback_data: 'start_trial' }
       ],
       [
-        { text: '💎 Basic Plan - ₦10,000', callback_data: 'pay_basic' }
+        { text: '💎 Basic Plan - ₦5,000', callback_data: 'pay_basic' }
       ],
       [
-        { text: '📊 Bi-Weekly VIP - ₦17,000', callback_data: 'pay_biweekly' }
+        { text: '📊 Bi-Weekly VIP - ₦9,000', callback_data: 'pay_biweekly' }
       ],
       [
-        { text: '📅 Monthly VIP - ₦35,000', callback_data: 'pay_monthly' }
+        { text: '📅 Monthly VIP - ₦18,000', callback_data: 'pay_monthly' }
       ]
     ]
   })
@@ -452,10 +452,9 @@ Free trials are only available for new users.
 
 To get VIP signals, upgrade to a paid plan:
 
-💎 Basic: ₦10,000 (7 days)
-📊 Bi-Weekly: ₦17,000 (14 days)
-📅 Monthly: ₦35,000 (30 days)
-👑 Premium: ₦22,000 (14 days + Copier)
+💎 Basic: ₦5,000 (7 days)
+📊 Bi-Weekly: ₦9,000 (14 days)
+📅 Monthly: ₦18,000 (30 days)
 
 Tap below to get started!`
 
@@ -547,9 +546,9 @@ async function handleHelp(user: TelegramUser): Promise<void> {
 Send the command: /pay
 
 <b>Step 2: Choose Your Plan</b>
-💎 Basic (₦10,000) - 7 days
-📊 Bi-Weekly (₦17,000) - 14 days (Save ₦3,000!)
-📅 Monthly (₦35,000) - 30 days (Save ₦25,000!)
+💎 Basic (₦5,000) - 7 days
+📊 Bi-Weekly (₦9,000) - 14 days (Best value!)
+📅 Monthly (₦18,000) - 30 days (Maximum savings!)
 🎁 Promo (₦3,000) - 7 days (Limited time!)
 
 ━━━━━━━━━━━━━━━━━━━
@@ -652,9 +651,9 @@ async function handleQuickPay(user: TelegramUser, planType: 'basic' | 'biweekly'
   pendingEmailUsers.add(telegramUserId)
 
   const planNames = {
-    basic: 'Basic Plan (₦10,000)',
-    biweekly: 'Bi-Weekly VIP + Copier (₦17,000)',
-    monthly: 'Monthly VIP + Copier (₦35,000)'
+    basic: 'Basic Plan (₦5,000)',
+    biweekly: 'Bi-Weekly VIP (₦9,000)',
+    monthly: 'Monthly VIP (₦18,000)'
   }
 
   await sendMessage(user.id, `💳 <b>Quick Pay: ${planNames[planType]}</b>
@@ -892,7 +891,7 @@ The bot connects to your MT5 account and automatically copies our winning trades
 
 ━━━━━━━━━━━━━━━━━━━
 
-<b>⚠️ AUTO COPIER BOT included in Bi-Weekly (₦17,000) & Monthly (₦35,000) only!</b>
+<b>📈 VIP SIGNALS - 96% Win Rate on Gold!</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -907,20 +906,20 @@ ${TRIAL_DISCOUNT.discountMessage}
 
 ` : ''}
 
-💎 <b>Basic Plan</b> - ${trialEligible ? '₦5,000' : '₦10,000'}
+💎 <b>Basic Plan</b> - ₦5,000
 ├─ <b>7 days</b> access to VIP signals
 ├─ <b>LEARN while you earn!</b> Perfect for beginners
 └─ You copy trades yourself & understand trading
 
-📊 <b>Bi-Weekly Plan + Copier</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s> (was ₦17,000)</s>' : ''}
+📊 <b>Bi-Weekly VIP</b> - ₦9,000
 ├─ <b>14 days</b> access to VIP signals
-├─ 🤖 <b>Includes AUTO COPIER BOT</b> - We copy trades FOR YOU!
-└─ Great balance of price & automation
+├─ <b>Better value than Basic!</b>
+└─ More time to practice & profit
 
-📅 <b>Monthly Plan + Copier</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s> (was ₦35,000)</s>' : ''}
+📅 <b>Monthly VIP</b> - ₦18,000
 ├─ <b>30 days</b> access to VIP signals
-├─ 🤖 <b>Includes AUTO COPIER BOT</b> - We copy trades FOR YOU!
-└─ Best value - automated profits for serious traders
+├─ <b>Best value - serious traders!</b>
+└─ Maximum time to profit
 
 ${trialEligible ? `
 ━━━━━━━━━━━━━━━━━━━
@@ -944,9 +943,9 @@ Then send: /verify_basic REFERENCE
 
 Or send /pay to start over
 
-💎 Pay ${trialEligible ? '₦5,000' : '₦10,000'} (Basic - 7 days) ${trialEligible ? '🔥 50% OFF!' : ''}
-📊 Pay ${trialEligible ? '₦8,500' : '₦17,000'} (Bi-Weekly + Copier - 14 days) ${trialEligible ? '🔥 50% OFF!' : ''}
-📅 Pay ${trialEligible ? '₦17,500' : '₦35,000'} (Monthly + Copier - 30 days) ${trialEligible ? '🔥 50% OFF!' : ''}
+💎 Pay ₦5,000 (Basic - 7 days)
+📊 Pay ₦9,000 (Bi-Weekly - 14 days)
+📅 Pay ₦18,000 (Monthly - 30 days)
 
 Still have questions? Send /help`
 
@@ -962,19 +961,19 @@ Still have questions? Send /help`
         reply_markup: {
           inline_keyboard: [
             [
-              { text: `💎 Pay ${trialEligible ? '₦5,000 (was ₦10,000)' : '₦10,000'} - Basic`, url: basicData.authorizationUrl }
+              { text: `💎 Pay ₦5,000 - Basic`, url: basicData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Basic Payment', callback_data: 'verify_basic' }
             ],
             [
-              { text: `📊 Pay ${trialEligible ? '₦8,500 (was ₦17,000)' : '₦17,000'} - Bi-Weekly + Copier`, url: biweeklyData.authorizationUrl }
+              { text: `📊 Pay ₦9,000 - Bi-Weekly`, url: biweeklyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Bi-Weekly Payment', callback_data: 'verify_biweekly' }
             ],
             [
-              { text: `📅 Pay ${trialEligible ? '₦17,500 (was ₦35,000)' : '₦35,000'} - Monthly + Copier`, url: monthlyData.authorizationUrl }
+              { text: `📅 Pay ₦18,000 - Monthly`, url: monthlyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Monthly Payment', callback_data: 'verify_monthly' }
@@ -2287,7 +2286,7 @@ The MT5 Auto Copier is only available for active Bi-Weekly/Monthly subscribers.
 ━━━━━━━━━━━━━━━━━━━
 
 <b>Want to renew?</b>
-Type /pay to see our Bi-Weekly (₦17,000) or Monthly (₦35,000) plans
+Type /pay to see our Bi-Weekly (₦9,000) or Monthly (₦18,000) plans
 
 Your subscription will be extended from today!`)
     } else {
@@ -2302,7 +2301,7 @@ The MT5 Auto Copier is only available for Bi-Weekly/Monthly subscribers.
 ━━━━━━━━━━━━━━━━━━━
 
 <b>Want to upgrade?</b>
-Type /pay to see our Bi-Weekly (₦17,000) or Monthly (₦35,000) plans`)
+Type /pay to see our Bi-Weekly (₦9,000) or Monthly (₦18,000) plans`)
     }
     return
   }
@@ -4102,9 +4101,9 @@ export async function POST(request: NextRequest) {
 
         // Send photo with instructions
         const planNames = {
-          basic: 'Basic (₦10,000)',
-          biweekly: 'Bi-Weekly + Copier (₦17,000)',
-          monthly: 'Monthly + Copier (₦35,000)',
+          basic: 'Basic (₦5,000)',
+          biweekly: 'Bi-Weekly (₦9,000)',
+          monthly: 'Monthly (₦18,000)',
           promo: 'Promo (₦3,000)'
         }
         const planName = planNames[planType]
@@ -4575,7 +4574,7 @@ Please enter a valid email address.
         if (!args[0]) {
           pendingVerificationUsers.set(userId, 'basic')
 
-          const caption = `✅ <b>Verifying Basic (₦10,000) Payment</b>
+          const caption = `✅ <b>Verifying Basic (₦5,000) Payment</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -4611,7 +4610,7 @@ Or send /cancel to exit.`
         if (!args[0]) {
           pendingVerificationUsers.set(userId, 'biweekly')
 
-          const caption = `✅ <b>Verifying Bi-Weekly (₦17,000) Payment</b>
+          const caption = `✅ <b>Verifying Bi-Weekly (₦9,000) Payment</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -4647,7 +4646,7 @@ Or send /cancel to exit.`
         if (!args[0]) {
           pendingVerificationUsers.set(userId, 'monthly')
 
-          const caption = `✅ <b>Verifying Monthly (₦35,000) Payment</b>
+          const caption = `✅ <b>Verifying Monthly (₦18,000) Payment</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
