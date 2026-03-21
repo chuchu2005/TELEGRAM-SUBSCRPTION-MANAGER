@@ -833,106 +833,39 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
 
 ━━━━━━━━━━━━━━━━━━━
 
-🤖 <b>MEET YOUR NEW MONEY-MAKING ROBOT!</b>
+🤖 <b>WANT TO MAKE MONEY WHILE YOU SLEEP?</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
-<b>📖 HOW IT WORKS (SUPER SIMPLE):</b>
+<b>🚀 AUTO COPIER BOT - HOW IT WORKS:</b>
 
-Imagine you have a friend named "Robot" who:
+The bot connects to your MT5 account and automatically copies our winning trades 24/7!
 
-1️⃣ <b>WATCHES</b> our VIP signals channel 24 hours a day
-2️⃣ <b>SEES</b> when we say "BUY NOW" or "SELL NOW"
-3️⃣ <b>COPIES</b> that trade to your account - FAST! (faster than you can click!)
-4️⃣ <b>MAKES YOU MONEY</b> - while you sleep, eat, play, work, or do NOTHING!
+<b>✅ WITH BOT:</b> Make money while you sleep, work, or play!
+<b>❌ WITHOUT BOT:</b> Must stare at phone 24/7 to copy trades yourself
 
-<b>🔧 THE TECHNICAL PART (STILL SIMPLE):</b>
+<b>💰 REAL RESULTS:</b>
+• "Made ₦45,000 while sleeping!"
+• "Made ₦32,000 while at work!"
+• "Made ₦28,000 playing football!"
 
-🔗 The bot connects to your MT5 trading account (like plugging in a cable)
-📱 When we send a trade signal in our VIP channel
-🤖 The bot SEES it instantly (like reading a text message)
-⚡ The bot COPIES the trade to your account automatically (like copy-paste on a computer)
-💰 Your account makes the SAME profit as our trades!
-🔄 It repeats this ALL DAY - EVERY DAY!
+<b>🎯 WHICH PLAN FITS YOU?</b>
 
-<b>✅ EXAMPLE:</b>
+<b>📊 BASIC (₦10,000):</b>
+• Perfect for BEGINNERS to learn trading
+• You copy trades yourself
+• Control your own entries/exits
+• Best way to start your journey!
 
-<b>WE POST:</b> "Buy GOLD now at $2000"
-<b>YOUR BOT SEES:</b> "Buy GOLD now at $2000"
-<b>YOUR BOT DOES:</b> Automatically buys GOLD for you at $2000
-<b>YOU MAKE:</b> Profit when GOLD goes up! 💰
-
-<b>ALL WITHOUT YOU TOUCHING YOUR PHONE!</b>
-
-<b>❌ WITHOUT BOT (HARD WAY):</b>
-❌ You must stare at your phone 24/7
-❌ You might be sleeping when we send a signal
-❌ You might be eating when we send a signal
-❌ You might be at work when we send a signal
-❌ You type slowly = bad price = LESS MONEY
-❌ You get tired and miss trades = NO MONEY
-
-<b>✅ WITH BOT (EASY WAY):</b>
-✅ Bot never sleeps - works 24/7
-✅ Bot sees every signal instantly
-✅ Bot types faster than any human
-✅ Bot gets the BEST prices = MORE MONEY
-✅ You make money while doing NOTHING!
-
-<b>💰 REAL RESULTS FROM USERS:</b>
-
-📊 "I made ₦45,000 while sleeping!"
-📊 "I was at work, bot made me ₦32,000!"
-📊 "I was playing football, bot made me ₦28,000!"
-📊 "I didn't check my phone for 2 days, made ₦67,000!"
-
-<b>🎯 THE BOTTOM LINE:</b>
-
-<b>📊 BASIC PLAN (₦10,000) - PERFECT FOR BEGINNERS!</b>
-• You copy trades yourself - <b>LEARN while you earn!</b>
-• Best for <b>new traders</b> who want to understand how trading works
-• You control when to enter/exit trades
-• <b>Great way to learn</b> - become a better trader!
-• You decide when to trade - no pressure
-• <b>Start your trading journey the right way!</b>
-
-<b>🤖 BI-WEEKLY or MONTHLY PLAN - PERFECT FOR BUSY PEOPLE!</b>
-• Robot copies trades automatically - <b>sit back & relax!</b>
-• Best for <b>experienced traders</b> or people with busy schedules
+<b>🤖 BI-WEEKLY/MONTHLY:</b>
+• Perfect for BUSY people
+• Bot copies trades automatically
 • Never miss a trade - works 24/7
-• <b>Make money while you sleep, work, or play!</b>
-• Bot handles everything - zero stress
-• <b>Automated profits on autopilot!</b>
-
-<b>🎓 BOTH PLANS ARE GREAT - CHOOSE WHAT FITS YOUR LIFESTYLE:</b>
-
-<b>Choose BASIC if you:</b>
-✅ Are new to trading and want to learn
-✅ Have time to check your phone during the day
-✅ Want to understand how trading works
-✅ Enjoy being hands-on with your investments
-
-<b>Choose BI-WEEKLY/MONTHLY if you:</b>
-✅ Are busy with work, school, or business
-✅ Can't check your phone 24/7
-✅ Want automated profits while you sleep
-✅ Prefer a hands-free approach
-
-<b>💡 THERE'S NO WRONG CHOICE - BOTH MAKE MONEY!</b>
-
-The question is: <b>Do you want to LEARN (Basic) or AUTOMATE (Bi-Weekly/Monthly)?</b>
-
-<b>🚀 Pick the path that fits YOUR life!</b>
+• Make money while you sleep!
 
 ━━━━━━━━━━━━━━━━━━━
 
-<b>⚠️ IMPORTANT:</b>
-
-The Auto Copier Bot is <b>ONLY included</b> in:
-• 📊 Bi-Weekly VIP + Copier (₦17,000)
-• 📅 Monthly VIP + Copier (₦35,000)
-
-<b>Basic plan (₦10,000) = NO ROBOT (Perfect for learning!)</b>
+<b>⚠️ AUTO COPIER BOT included in Bi-Weekly (₦17,000) & Monthly (₦35,000) only!</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
