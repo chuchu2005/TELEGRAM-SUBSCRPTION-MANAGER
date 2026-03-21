@@ -831,6 +831,111 @@ async function showPaymentButtons(user: TelegramUser, email: string): Promise<vo
 
 💳 <b>Step 2: Choose Your Plan</b>
 
+━━━━━━━━━━━━━━━━━━━
+
+🤖 <b>MEET YOUR NEW MONEY-MAKING ROBOT!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>📖 HOW IT WORKS (SUPER SIMPLE):</b>
+
+Imagine you have a friend named "Robot" who:
+
+1️⃣ <b>WATCHES</b> our VIP signals channel 24 hours a day
+2️⃣ <b>SEES</b> when we say "BUY NOW" or "SELL NOW"
+3️⃣ <b>COPIES</b> that trade to your account - FAST! (faster than you can click!)
+4️⃣ <b>MAKES YOU MONEY</b> - while you sleep, eat, play, work, or do NOTHING!
+
+<b>🔧 THE TECHNICAL PART (STILL SIMPLE):</b>
+
+🔗 The bot connects to your MT5 trading account (like plugging in a cable)
+📱 When we send a trade signal in our VIP channel
+🤖 The bot SEES it instantly (like reading a text message)
+⚡ The bot COPIES the trade to your account automatically (like copy-paste on a computer)
+💰 Your account makes the SAME profit as our trades!
+🔄 It repeats this ALL DAY - EVERY DAY!
+
+<b>✅ EXAMPLE:</b>
+
+<b>WE POST:</b> "Buy GOLD now at $2000"
+<b>YOUR BOT SEES:</b> "Buy GOLD now at $2000"
+<b>YOUR BOT DOES:</b> Automatically buys GOLD for you at $2000
+<b>YOU MAKE:</b> Profit when GOLD goes up! 💰
+
+<b>ALL WITHOUT YOU TOUCHING YOUR PHONE!</b>
+
+<b>❌ WITHOUT BOT (HARD WAY):</b>
+❌ You must stare at your phone 24/7
+❌ You might be sleeping when we send a signal
+❌ You might be eating when we send a signal
+❌ You might be at work when we send a signal
+❌ You type slowly = bad price = LESS MONEY
+❌ You get tired and miss trades = NO MONEY
+
+<b>✅ WITH BOT (EASY WAY):</b>
+✅ Bot never sleeps - works 24/7
+✅ Bot sees every signal instantly
+✅ Bot types faster than any human
+✅ Bot gets the BEST prices = MORE MONEY
+✅ You make money while doing NOTHING!
+
+<b>💰 REAL RESULTS FROM USERS:</b>
+
+📊 "I made ₦45,000 while sleeping!"
+📊 "I was at work, bot made me ₦32,000!"
+📊 "I was playing football, bot made me ₦28,000!"
+📊 "I didn't check my phone for 2 days, made ₦67,000!"
+
+<b>🎯 THE BOTTOM LINE:</b>
+
+<b>📊 BASIC PLAN (₦10,000) - PERFECT FOR BEGINNERS!</b>
+• You copy trades yourself - <b>LEARN while you earn!</b>
+• Best for <b>new traders</b> who want to understand how trading works
+• You control when to enter/exit trades
+• <b>Great way to learn</b> - become a better trader!
+• You decide when to trade - no pressure
+• <b>Start your trading journey the right way!</b>
+
+<b>🤖 BI-WEEKLY or MONTHLY PLAN - PERFECT FOR BUSY PEOPLE!</b>
+• Robot copies trades automatically - <b>sit back & relax!</b>
+• Best for <b>experienced traders</b> or people with busy schedules
+• Never miss a trade - works 24/7
+• <b>Make money while you sleep, work, or play!</b>
+• Bot handles everything - zero stress
+• <b>Automated profits on autopilot!</b>
+
+<b>🎓 BOTH PLANS ARE GREAT - CHOOSE WHAT FITS YOUR LIFESTYLE:</b>
+
+<b>Choose BASIC if you:</b>
+✅ Are new to trading and want to learn
+✅ Have time to check your phone during the day
+✅ Want to understand how trading works
+✅ Enjoy being hands-on with your investments
+
+<b>Choose BI-WEEKLY/MONTHLY if you:</b>
+✅ Are busy with work, school, or business
+✅ Can't check your phone 24/7
+✅ Want automated profits while you sleep
+✅ Prefer a hands-free approach
+
+<b>💡 THERE'S NO WRONG CHOICE - BOTH MAKE MONEY!</b>
+
+The question is: <b>Do you want to LEARN (Basic) or AUTOMATE (Bi-Weekly/Monthly)?</b>
+
+<b>🚀 Pick the path that fits YOUR life!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>⚠️ IMPORTANT:</b>
+
+The Auto Copier Bot is <b>ONLY included</b> in:
+• 📊 Bi-Weekly VIP + Copier (₦17,000)
+• 📅 Monthly VIP + Copier (₦35,000)
+
+<b>Basic plan (₦10,000) = NO ROBOT (Perfect for learning!)</b>
+
+━━━━━━━━━━━━━━━━━━━
+
 ${trialEligible ? `
 ━━━━━━━━━━━━━━━━━━━
 
@@ -856,15 +961,6 @@ ${TRIAL_DISCOUNT.discountMessage}
 ├─ <b>30 days</b> access to VIP signals
 ├─ 🤖 <b>Includes AUTO COPIER BOT</b> - We copy trades FOR YOU!
 └─ Best value - automated profits for serious traders
-├─ ⚡ <b>Instant execution</b> - never miss a trade
-└─ 🚀 <b>Zero effort</b> - fully automated!
-
-━━━━━━━━━━━━━━━━━━━
-
-<b>🔥 Premium = Passive Income!</b>
-
-Stop missing trades while you sleep/busy.
-Let our bot copy trades FOR you 24/7!
 
 ${trialEligible ? `
 ━━━━━━━━━━━━━━━━━━━
