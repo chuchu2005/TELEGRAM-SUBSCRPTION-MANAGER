@@ -22,6 +22,9 @@ const rateLimitStore = new Map<string, { count: number; blockedUntil: number }>(
 // Store users waiting for email input
 const pendingEmailUsers = new Set<string>()
 
+// Store users who selected a quick pay plan (telegramUserId -> planType)
+const pendingPaymentPlans = new Map<string, 'basic' | 'biweekly' | 'monthly'>()
+
 // Store users waiting for promo email input
 const pendingPromoEmailUsers = new Set<string>()
 
@@ -523,11 +526,20 @@ Basic plan (₦10,000) = You copy trades yourself (no bot)
   // Small delay to ensure order
   await new Promise(resolve => setTimeout(resolve, 500))
 
-  // Send second message (Plan options + button)
+  // Send second message (Plan options + buttons)
   await sendMessageWithKeyboard(user.id, message2, {
     inline_keyboard: [
       [
         { text: '🎁 Start Your FREE Trial Now! 🎁', callback_data: 'start_trial' }
+      ],
+      [
+        { text: '💎 Basic Plan - ₦10,000', callback_data: 'pay_basic' }
+      ],
+      [
+        { text: '📊 Bi-Weekly + Copier - ₦17,000', callback_data: 'pay_biweekly' }
+      ],
+      [
+        { text: '📅 Monthly + Copier - ₦35,000', callback_data: 'pay_monthly' }
       ]
     ]
   })
@@ -744,6 +756,124 @@ Please provide your email address to continue.
 <i>Just type your email (e.g., john@email.com)</i>
 
 <i>Or send /cancel to exit</i>`)
+}
+
+/**
+ * Handle quick pay button click - ask for email first, then generate payment link
+ */
+async function handleQuickPay(user: TelegramUser, planType: 'basic' | 'biweekly' | 'monthly'): Promise<void> {
+  const telegramUserId = user.id.toString()
+
+  // Store which plan they want to pay for
+  pendingPaymentPlans.set(telegramUserId, planType)
+
+  // Add to pending email list
+  pendingEmailUsers.add(telegramUserId)
+
+  const planNames = {
+    basic: 'Basic Plan (₦10,000)',
+    biweekly: 'Bi-Weekly VIP + Copier (₦17,000)',
+    monthly: 'Monthly VIP + Copier (₦35,000)'
+  }
+
+  await sendMessage(user.id, `💳 <b>Quick Pay: ${planNames[planType]}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+📧 <b>Step 1: Enter Your Email</b>
+
+Please provide your email address to continue.
+
+<b>Why do we need this?</b>
+✅ To send your official payment receipt
+✅ To help if there are any issues
+✅ To notify you before expiration
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Just type your email (e.g., john@email.com)</i>
+
+<i>Or send /cancel to exit</i>`)
+}
+
+/**
+ * Generate payment link for a specific plan
+ */
+async function generatePaymentLink(user: TelegramUser, planType: 'basic' | 'biweekly' | 'monthly', email: string): Promise<void> {
+  const telegramUserId = user.id.toString()
+  const telegramUsername = user.username || 'unknown'
+
+  const planNames = {
+    basic: 'Basic Plan',
+    biweekly: 'Bi-Weekly VIP + Copier',
+    monthly: 'Monthly VIP + Copier'
+  }
+
+  try {
+    console.log('Creating payment link for user:', telegramUserId, 'plan:', planType, 'email:', email)
+
+    // Create payment link for the selected plan
+    const response = await fetch(`${APP_URL}/api/payment/link`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        telegramId: telegramUserId,
+        telegramUsername,
+        planType,
+        email
+      })
+    })
+
+    const data = await response.json()
+    console.log('Payment link response:', data)
+
+    if (!data.success) {
+      console.error('Payment link generation failed:', data)
+      await sendMessage(user.id, `❌ <b>Failed to generate payment link</b>
+
+Please try again or send /pay to start over.`)
+      return
+    }
+
+    const message = `✅ <b>Email Confirmed:</b> ${email}
+
+━━━━━━━━━━━━━━━━━━━
+
+💳 <b>Plan Selected: ${planNames[planType]}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+🔗 <b>Click the link below to pay:</b>
+
+${data.authorizationUrl}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Amount:</b> ₦${(data.amount / 100).toLocaleString()}
+
+<b>⚠️ IMPORTANT:</b>
+• After payment, copy your <b>Reference Number</b>
+• Send it to this bot as: <code>/verify_${planType} &lt;reference&gt;</code>
+• Example: <code>/verify_${planType} XHY7ABC123</code>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Need help?</b> Send /help`
+
+    await sendMessageWithKeyboard(user.id, message, {
+      inline_keyboard: [
+        [
+          { text: '🔗 Open Payment Link', url: data.authorizationUrl }
+        ]
+      ]
+    })
+
+  } catch (error) {
+    console.error('Error generating payment link:', error)
+    await sendMessage(user.id, `❌ <b>Error generating payment link</b>
+
+Please try again or send /pay to start over.`)
+  }
 }
 
 /**
@@ -4352,6 +4482,15 @@ Or send /cancel to exit.`
               case 'start_trial':
                 await handleTrial(from)
                 break
+              case 'pay_basic':
+                await handleQuickPay(from, 'basic')
+                break
+              case 'pay_biweekly':
+                await handleQuickPay(from, 'biweekly')
+                break
+              case 'pay_monthly':
+                await handleQuickPay(from, 'monthly')
+                break
               default:
                 // If not specifically handled here, let it fall through to normal switch
                 // with the new command/args if we were to modify them.
@@ -4456,8 +4595,18 @@ Please enter a valid email address.
         return NextResponse.json({ ok: true })
       }
 
-      // Show payment buttons with the email
-      await showPaymentButtons(from, email)
+      // Check if user has a pending payment plan (quick pay flow)
+      const pendingPlan = pendingPaymentPlans.get(userId)
+      if (pendingPlan) {
+        // Generate payment link for the specific plan
+        await generatePaymentLink(from, pendingPlan, email)
+        // Clean up
+        pendingPaymentPlans.delete(userId)
+        pendingEmailUsers.delete(userId)
+      } else {
+        // Show all payment buttons (normal flow)
+        await showPaymentButtons(from, email)
+      }
       return NextResponse.json({ ok: true })
     }
 
@@ -4507,6 +4656,7 @@ Please enter a valid email address.
       case '/cancel':
         if (pendingEmailUsers.has(userId)) {
           pendingEmailUsers.delete(userId)
+          pendingPaymentPlans.delete(userId)
           await sendMessage(from.id, '✅ Cancelled. Send /pay when you\'re ready to get payment links.')
         } else if (pendingPromoEmailUsers.has(userId)) {
           pendingPromoEmailUsers.delete(userId)
