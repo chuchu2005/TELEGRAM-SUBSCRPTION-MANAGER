@@ -351,43 +351,119 @@ ${statsSection}
 
 ━━━━━━━━━━━━━━━━━━━
 
-🤖 <b>WANT TO MAKE MONEY WHILE YOU SLEEP?</b>
+🤖 <b>🔥 WANT TO MAKE MONEY WHILE YOU SLEEP?</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
-<b>🚀 AUTO COPIER BOT - HOW IT WORKS:</b>
+<b>📖 IMAGINE THIS:</b>
 
-The bot connects to your MT5 account and automatically copies our winning trades 24/7!
+You go to bed at night...
+You wake up in the morning...
+<b>YOUR ACCOUNT HAS MADE ₦45,000!</b> 💰
 
-<b>✅ WITH BOT:</b> Make money while you sleep, work, or play!
-<b>❌ WITHOUT BOT:</b> Must stare at phone 24/7 to copy trades yourself
+<b>While you were SLEEPING, our Auto Copier Bot was:</b>
+✅ Watching our VIP signals 24/7
+✅ Copying winning trades AUTOMATICALLY
+✅ Making you money while you dream!
 
-<b>💰 REAL RESULTS:</b>
-• "Made ₦45,000 while sleeping!"
-• "Made ₦32,000 while at work!"
-• "Made ₦28,000 playing football!"
+<b>⚡ HOW IT WORKS (SIMPLE):</b>
 
-<b>🎯 WHICH PLAN FITS YOU?</b>
+1️⃣ Bot connects to your MT5 trading account
+2️⃣ When we post "BUY GOLD NOW" in VIP channel
+3️⃣ Bot SEES it instantly (faster than humans!)
+4️⃣ Bot COPIES the trade to your account automatically
+5️⃣ You make the SAME profits we make!
 
-<b>📊 BASIC (₦10,000):</b>
-• Perfect for BEGINNERS to learn trading
-• You copy trades yourself
-• Control your own entries/exits
-• Best way to start your journey!
+<b>💰 REAL RESULTS FROM REAL USERS:</b>
 
-<b>🤖 BI-WEEKLY/MONTHLY:</b>
-• Perfect for BUSY people
-• Bot copies trades automatically
-• Never miss a trade - works 24/7
-• Make money while you sleep!
+📊 "I woke up to ₦45,000 profit - while sleeping!"
+📊 "Made ₦32,000 while I was at my 9-5 job!"
+📊 "Made ₦28,000 playing football with friends!"
+📊 "Made ₦67,000 in 2 days - didn't check my phone once!"
+
+<b>❌ WITHOUT BOT (HARD LIFE):</b>
+❌ Must stare at phone 24/7 (never sleep!)
+❌ Miss trades while eating, working, sleeping
+❌ Type slowly = bad prices = LESS MONEY
+❌ Get tired and give up = NO MONEY
+
+<b>✅ WITH BOT (EASY LIFE):</b>
+✅ Bot works while you sleep, eat, work, play
+✅ Never misses a trade - 24/7 coverage
+✅ Faster than humans = BEST prices = MORE MONEY
+✅ Zero effort - just check profits at end of day!
+
+<b>🎯 SO WHAT'S THE CATCH?</b>
+
+Only Bi-Weekly (₦17,000) and Monthly (₦35,000) plans include the Auto Copier Bot!
+
+Basic plan (₦10,000) = You copy trades yourself (no bot)
 
 ━━━━━━━━━━━━━━━━━━━
 
-<b>⚠️ AUTO COPIER BOT included in Bi-Weekly (₦17,000) & Monthly (₦35,000) only!</b>
+<i>📊 NEXT MESSAGE: Choose your plan below 👇</i>
+
+━━━━━━━━━━━━━━━━━━━`
+
+  await sendMessage(user.id, message)
+
+  // Small delay to ensure order
+  await new Promise(resolve => setTimeout(resolve, 500))
+
+  // Second message: Plan options + details
+  const message2 = `💳 <b>Choose Your Plan:</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
-Choose a plan to get instant access to our VIP community:
+💎 <b>Basic Plan</b> - ${trialEligible ? '₦5,000' : '₦10,000'} ${trialEligible ? '<s>(was ₦10,000)</s>' : ''}
+├─ <b>7 days</b> access to VIP signals
+├─ <b>🎓 PERFECT FOR BEGINNERS!</b>
+├─ You copy trades yourself & LEARN trading
+└─ <b>Best way to start!</b>
+
+📊 <b>Bi-Weekly VIP + Copier</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s>(was ₦17,000)</s>' : ''}
+├─ <b>14 days</b> access to VIP signals
+├─ <b>🤖 INCLUDES AUTO COPIER BOT!</b>
+├─ Make money while you sleep!
+└─ <b>Great value!</b>
+
+📅 <b>Monthly VIP + Copier</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s>(was ₦35,000)</s>' : ''}
+├─ <b>30 days</b> access to VIP signals
+├─ <b>🤖 INCLUDES AUTO COPIER BOT!</b>
+├─ Make money while you sleep!
+└─ <b>Best for serious traders!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>🔥 WHY CHOOSE BI-WEEKLY OR MONTHLY?</b>
+
+<b>Without Auto Copier (Basic Plan):</b>
+❌ Watch phone 24/7 or miss trades
+❌ Slow copying = bad prices
+❌ Stressful - always checking Telegram
+❌ Make LESS money
+
+<b>With Auto Copier (Bi-Weekly/Monthly):</b>
+✅ Bot watches 24/7 - never miss trades
+✅ Instant copying = BEST prices
+✅ Zero stress - just check profits later
+✅ Make MORE money automatically!
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>📋 Quick Start:</b>
+1️⃣ Send /pay to get payment link
+2️⃣ Complete payment securely
+3️⃣ Copy your reference & send to bot
+4️⃣ Receive invite link instantly!
+
+<b>Need help?</b> Send /help
+
+<b>Any issues?</b> Contact @pearsignals
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Type /pay to get started</i>
 
 💎 <b>Basic Plan</b> - ${trialEligible ? '₦5,000' : '₦10,000'} ${trialEligible ? '<s> (was ₦10,000)</s>' : ''}
 ├─ <b>7 days</b> access to VIP signals
@@ -441,7 +517,14 @@ Choose a plan to get instant access to our VIP community:
 
 <i>Type /pay to get started</i>`
 
-  await sendMessageWithKeyboard(user.id, message, {
+  // Send first message (FOMO + Auto Copier Bot explanation)
+  await sendMessage(user.id, message)
+
+  // Small delay to ensure order
+  await new Promise(resolve => setTimeout(resolve, 500))
+
+  // Send second message (Plan options + button)
+  await sendMessageWithKeyboard(user.id, message2, {
     inline_keyboard: [
       [
         { text: '🎁 Start Your FREE Trial Now! 🎁', callback_data: 'start_trial' }
