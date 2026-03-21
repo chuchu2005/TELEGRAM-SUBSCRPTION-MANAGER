@@ -70,9 +70,12 @@ export interface ChatMemberResponse {
 }
 
 /**
- * Send a message to a Telegram chat
+ * Send a message to a Telegram chat with timeout
  */
-export async function sendMessage(chatId: string | number, text: string, parseMode: 'Markdown' | 'MarkdownV2' | 'HTML' | undefined = 'HTML'): Promise<boolean> {
+export async function sendMessage(chatId: string | number, text: string, parseMode: 'Markdown' | 'MarkdownV2' | 'HTML' | undefined = 'HTML', timeoutMs: number = 10000): Promise<boolean> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
   try {
     const body: any = {
       chat_id: chatId,
@@ -83,26 +86,38 @@ export async function sendMessage(chatId: string | number, text: string, parseMo
     const response = await fetch(`${TELEGRAM_API_BASE}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: controller.signal
     })
+
+    clearTimeout(timeoutId)
 
     const data = await response.json()
     return data.ok
-  } catch (error) {
-    console.error('Error sending Telegram message:', error)
+  } catch (error: any) {
+    clearTimeout(timeoutId)
+    if (error.name === 'AbortError') {
+      console.error(`[sendMessage] Timeout sending to ${chatId} after ${timeoutMs}ms`)
+    } else {
+      console.error('[sendMessage] Error:', error)
+    }
     return false
   }
 }
 
 /**
- * Send a message with inline keyboard to a Telegram chat
+ * Send a message with inline keyboard to a Telegram chat with timeout
  */
 export async function sendMessageWithKeyboard(
   chatId: string | number,
   text: string,
   replyMarkup: { inline_keyboard: Array<Array<{ text: string; callback_data?: string; url?: string }>> },
-  parseMode: 'Markdown' | 'MarkdownV2' | 'HTML' = 'HTML'
+  parseMode: 'Markdown' | 'MarkdownV2' | 'HTML' = 'HTML',
+  timeoutMs: number = 10000
 ): Promise<boolean> {
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+
   try {
     const body: any = {
       chat_id: chatId,
@@ -114,13 +129,21 @@ export async function sendMessageWithKeyboard(
     const response = await fetch(`${TELEGRAM_API_BASE}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body)
+      body: JSON.stringify(body),
+      signal: controller.signal
     })
+
+    clearTimeout(timeoutId)
 
     const data = await response.json()
     return data.ok
-  } catch (error) {
-    console.error('Error sending Telegram message with keyboard:', error)
+  } catch (error: any) {
+    clearTimeout(timeoutId)
+    if (error.name === 'AbortError') {
+      console.error(`[sendMessageWithKeyboard] Timeout sending to ${chatId} after ${timeoutMs}ms`)
+    } else {
+      console.error('[sendMessageWithKeyboard] Error:', error)
+    }
     return false
   }
 }

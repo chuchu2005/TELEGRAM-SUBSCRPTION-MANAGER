@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText, getChatMember } from '@/lib/telegram'
-import { generateMessageHash, hasReceivedMessageRecently, logBroadcastMessage } from '@/lib/broadcast'
-import { BROADCAST_CONFIG } from '@/lib/broadcast-config'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
 import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID, TRADE_STATS_CONFIG, TRIAL_DISCOUNT, GENERAL_CHANNEL_ID, GENERAL_CHANNEL_NAME } from '@/lib/config'
 import { createMt5Account, updateCopierSettings, removeUserMt5Account } from '@/lib/metacopier'
@@ -1381,17 +1379,16 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
   const targetType = planType === 'all' ? 'all users' : `${planType} users`
   const filterType = activeOnly ? 'active subscribers only' : targetType
 
-  await sendMessage(user.id, `📢 <b>Starting Broadcast...</b>\n\n━━━━━━━━━━━━━━━━━━━\n\nTarget: ${filterType}\n\n<i>Processing in background. I will send you progress updates as messages are sent!</i>`)
+  await sendMessage(user.id, `📢 <b>Starting Broadcast...</b>\n\nTarget: ${filterType}\n\nProcessing in background...`)
 
-  // 2. Set the lock SYNCHRONOUSLY before starting the background task
+  // 2. Set the lock before starting background task
   isGlobalBroadcastRunning = true
   broadcastStartTime = Date.now()
 
-  // 3. Start the background process without awaiting the loop
+  // 3. Start simplified background process
   ;(async () => {
     try {
-      console.log('[Broadcast] Starting background broadcast process...')
-      console.log('[Broadcast] Config:', { planType, activeOnly })
+      console.log('[Broadcast] Starting simplified broadcast...')
 
       // Build query for recipients
       let whereClause: any = {}
@@ -1401,183 +1398,94 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
         whereClause.isRemoved = false
       }
 
-      console.log('[Broadcast] Querying recipients...')
-
+      // Query recipients with pagination
       let recipients: { telegramUserId: string }[] = []
-
-      // Use cursor-based pagination for large datasets
       let skip = 0
       const batchSize = 100
-      let hasMore = true
 
-      while (hasMore) {
-        try {
-          if (planType === 'all' && !activeOnly) {
-            console.log('[Broadcast] Fetching users batch, skip:', skip)
-            const batch = await prisma.user.findMany({
-              select: { telegramUserId: true },
-              skip: skip,
-              take: batchSize
-            })
-            recipients.push(...batch)
-            hasMore = batch.length === batchSize
-            skip += batchSize
-          } else {
-            console.log('[Broadcast] Fetching subscriptions batch, skip:', skip)
-            const batch = await prisma.subscription.findMany({
-              where: whereClause,
-              select: { telegramUserId: true },
-              distinct: ['telegramUserId'],
-              skip: skip,
-              take: batchSize
-            })
-            recipients.push(...batch)
-            hasMore = batch.length === batchSize
-            skip += batchSize
-          }
-        } catch (dbError) {
-          console.error('[Broadcast] Database query failed:', dbError)
-          await sendMessage(user.id, `❌ <b>Database Query Failed!</b>\n\nError: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`)
-          return
+      while (true) {
+        let batch: { telegramUserId: string }[] = []
+
+        if (planType === 'all' && !activeOnly) {
+          batch = await prisma.user.findMany({
+            select: { telegramUserId: true },
+            skip,
+            take: batchSize
+          })
+        } else {
+          batch = await prisma.subscription.findMany({
+            where: whereClause,
+            select: { telegramUserId: true },
+            distinct: ['telegramUserId'],
+            skip,
+            take: batchSize
+          })
         }
+
+        recipients.push(...batch)
+        if (batch.length < batchSize) break
+        skip += batchSize
       }
 
-      console.log('[Broadcast] Found recipients:', recipients.length)
-      await sendMessage(user.id, `✅ <b>Found ${recipients.length} Recipients</b>\n\nStarting to send messages...`)
+      console.log(`[Broadcast] Found ${recipients.length} recipients`)
 
-      // Handle empty recipient list
       if (recipients.length === 0) {
-        await sendMessage(user.id, `❌ <b>No Recipients Found!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\nTarget: ${filterType}\n\nNo users match these criteria. Try a different target.`)
+        await sendMessage(user.id, `❌ <b>No Recipients Found!</b>\n\nTarget: ${filterType}`)
         return
       }
 
-      console.log(`[Broadcast] Starting background loop for ${recipients.length} users`)
+      await sendMessage(user.id, `✅ <b>Sending to ${recipients.length} recipients...</b>`)
 
-      // Generate message hash once for all recipients
-      const messageHash = generateMessageHash(cleanMessage)
-
+      // Send messages
       let successCount = 0
       let failedCount = 0
-      let duplicateCount = 0
-      const failedUsers: string[] = []
-      let processedCount = 0
-      const progressInterval = Math.max(10, Math.floor(recipients.length / 20)) // Send progress every ~5% or every 10 messages
 
-      await sendMessage(user.id, `📊 <b>Broadcast Started!</b>\n\nFound ${recipients.length} recipients\nSending ${recipients.length > progressInterval ? '(with progress updates)' : '...'}\n\nTarget: ${filterType}`)
-
-      console.log('[Broadcast] Starting send loop for', recipients.length, 'recipients')
-
-      for (const recipient of recipients) {
-        // Check for broadcast timeout (2 hours max)
-        if (broadcastStartTime && Date.now() - broadcastStartTime > BROADCAST_CONFIG.BROADCAST_TIMEOUT_HOURS * 60 * 60 * 1000) {
-          console.warn('[Broadcast] Timeout reached, releasing lock')
-          await sendMessage(user.id, `⏱️ <b>Broadcast Timeout</b>\n\nThe broadcast has been running for ${BROADCAST_CONFIG.BROADCAST_TIMEOUT_HOURS} hours and has timed out. The lock has been released.`)
-          break
-        }
+      for (let i = 0; i < recipients.length; i++) {
+        const recipient = recipients[i]
 
         // Check for cancellation
         if (shouldCancelBroadcast) {
-          console.log('[Broadcast] STOPPED by admin command.')
-          await sendMessage(user.id, `🛑 <b>Broadcast Stopped!</b>\n\nI have stopped the remaining sends as requested.`)
+          await sendMessage(user.id, `🛑 <b>Broadcast Stopped!</b>`)
           break
         }
 
-        // Check for duplicate (deduplication)
-        console.log(`[Broadcast] Checking deduplication for user ${recipient.telegramUserId}`)
-        let hasReceived = false
+        // Send message with timeout
+        let sent = false
         try {
-          hasReceived = await hasReceivedMessageRecently(recipient.telegramUserId, messageHash)
-        } catch (dedupError) {
-          console.error('[Broadcast] Deduplication check failed for', recipient.telegramUserId, ':', dedupError)
-          // Continue anyway if deduplication fails
-        }
-        console.log(`[Broadcast] Deduplication check result for ${recipient.telegramUserId}:`, hasReceived)
-        if (hasReceived) {
-          duplicateCount++
-          console.log(`[Broadcast] Skipped duplicate for user ${recipient.telegramUserId}`)
-          await new Promise(resolve => setTimeout(resolve, BROADCAST_CONFIG.RATE_LIMIT_MS))
-          continue
-        }
-
-        console.log(`[Broadcast] Sending to user ${recipient.telegramUserId}...`)
-        try {
-          let sent = false
-
-          // Add timeout to prevent hanging
-          const sendTimeout = new Promise<boolean>((resolve) => {
-            setTimeout(() => {
-              console.log(`[Broadcast] Send timeout for user ${recipient.telegramUserId}`)
-              resolve(false)
-            }, 10000) // 10 second timeout
-          })
-
-          const sendPromise = async () => {
-            if (buttonText && callbackData) {
-              return await sendMessageWithKeyboard(recipient.telegramUserId, cleanMessage, {
-                inline_keyboard: [[{ text: buttonText, callback_data: callbackData }]]
-              })
-            } else {
-              return await sendMessage(recipient.telegramUserId, cleanMessage)
-            }
-          }
-
-          sent = await Promise.race([sendPromise(), sendTimeout])
-
-          if (sent) {
-            console.log(`[Broadcast] ✓ Sent to user ${recipient.telegramUserId}`)
-            successCount++
-            // Log successful send to database
-            try {
-              await logBroadcastMessage(recipient.telegramUserId, messageHash)
-            } catch (logError) {
-              // Don't stop broadcast - message was already sent
-              console.error(`Failed to log broadcast for user ${recipient.telegramUserId}:`, logError)
-            }
+          if (buttonText && callbackData) {
+            sent = await sendMessageWithKeyboard(recipient.telegramUserId, cleanMessage, {
+              inline_keyboard: [[{ text: buttonText, callback_data: callbackData }]]
+            })
           } else {
-            console.log(`[Broadcast] ✗ Failed to send to user ${recipient.telegramUserId} (sendMessage returned false)`)
-            failedCount++
-            failedUsers.push(recipient.telegramUserId)
+            sent = await sendMessage(recipient.telegramUserId, cleanMessage)
           }
-        } catch (error: any) {
-          // Handle Telegram rate limit (429 error)
-          if (error?.response?.status === 429) {
-            const retryAfter = error.response.data?.retry_after || 30
-            console.warn(`[Broadcast] Rate limited, waiting ${retryAfter}s`)
-            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000))
-            continue // Retry this user
-          }
+        } catch (error) {
+          console.error(`[Broadcast] Error sending to ${recipient.telegramUserId}:`, error)
+        }
 
-          // Handle other errors
-          console.log(`[Broadcast] ✗ Exception sending to user ${recipient.telegramUserId}:`, error)
+        if (sent) {
+          successCount++
+          console.log(`[Broadcast] ✓ Sent to ${recipient.telegramUserId} (${i + 1}/${recipients.length})`)
+        } else {
           failedCount++
-          failedUsers.push(recipient.telegramUserId)
-          console.error(`[Broadcast] Failed to send to ${recipient.telegramUserId}:`, error)
+          console.log(`[Broadcast] ✗ Failed to send to ${recipient.telegramUserId} (${i + 1}/${recipients.length})`)
         }
 
-        processedCount++
-
-        // Send progress update at intervals
-        if (processedCount % progressInterval === 0 || processedCount === recipients.length) {
-          const percentage = Math.round((processedCount / recipients.length) * 100)
-          await sendMessage(user.id, `📊 <b>Broadcast Progress:</b>\n\nProcessed: ${processedCount}/${recipients.length} (${percentage}%)\n\n✅ Sent: ${successCount}\n❌ Failed: ${failedCount}\n⏭️ Skipped: ${duplicateCount}`)
-        }
-
-        // Rate limiting delay
-        await new Promise(resolve => setTimeout(resolve, BROADCAST_CONFIG.RATE_LIMIT_MS))
+        // Rate limiting delay (50ms for faster sending)
+        await new Promise(resolve => setTimeout(resolve, 50))
       }
 
-      await sendMessage(user.id, `✅ <b>Broadcast Complete!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n📊 <b>Final Stats:</b>\n• ✅ Successful: ${successCount}\n• ❌ Failed: ${failedCount}\n• ⏭️ Skipped (duplicate): ${duplicateCount}\n• 📤 Total processed: ${processedCount}\n\n${failedUsers.length > 0 ? `❌ Failed users:\n${failedUsers.slice(0, 10).join('\n')}${failedUsers.length > 10 ? '\n...and more' : ''}` : ''}`)
+      // Send final summary
+      await sendMessage(user.id, `✅ <b>Broadcast Complete!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n📊 <b>Stats:</b>\n• ✅ Sent: ${successCount}\n• ❌ Failed: ${failedCount}\n• 📤 Total: ${recipients.length}`)
       console.log('[Broadcast] Completed successfully')
     } catch (err) {
-      console.error('[Broadcast Task] Error:', err)
-      console.error('[Broadcast Task] Error stack:', err instanceof Error ? err.stack : 'No stack trace')
-      await sendMessage(user.id, `❌ <b>Broadcast Error!</b>\n\nError: ${err instanceof Error ? err.message : 'Unknown error'}\n\nCheck server logs for details.`)
+      console.error('[Broadcast] Error:', err)
+      await sendMessage(user.id, `❌ <b>Broadcast Error!</b>\n\nError: ${err instanceof Error ? err.message : 'Unknown error'}`)
     } finally {
-      console.log('[Broadcast] Releasing lock')
-      // Always release lock, even on error
       isGlobalBroadcastRunning = false
       shouldCancelBroadcast = false
       broadcastStartTime = null
+      console.log('[Broadcast] Lock released')
     }
   })()
 }
