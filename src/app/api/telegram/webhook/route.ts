@@ -530,7 +530,7 @@ Basic plan (₦10,000) = You copy trades yourself (no bot)
   await sendMessageWithKeyboard(user.id, message2, {
     inline_keyboard: [
       [
-        { text: '🎁 Start Your FREE Trial Now! 🎁', callback_data: 'start_trial' }
+        { text: '🎁 Join for FREE for 24 hrs', callback_data: 'start_trial' }
       ],
       [
         { text: '💎 Basic Plan - ₦10,000', callback_data: 'pay_basic' }
