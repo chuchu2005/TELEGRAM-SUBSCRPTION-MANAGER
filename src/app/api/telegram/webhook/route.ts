@@ -4585,7 +4585,27 @@ Or send /cancel to exit.`
       return NextResponse.json({ ok: true })
     }
 
-    // Check if user is waiting for email input
+    // Check if user is in conversation flow (MT5 setup or promo creation) FIRST
+    // This takes priority over email validation to avoid conflicts
+    const conversationState = await getConversationState(userId)
+    if (conversationState && !command.startsWith('/')) {
+      // Check if it's a promo conversation step
+      const promoSteps = ['promo_code', 'promo_name', 'plan_type', 'duration', 'is_free', 'has_copier', 'amount', 'expiry']
+      try {
+        if (promoSteps.includes(conversationState.step)) {
+          console.log('[Webhook] Calling handlePromoConversation for step:', conversationState.step)
+          await handlePromoConversation(from, text!)
+        } else {
+          await handleMt5Conversation(from, text!)
+        }
+      } catch (error) {
+        console.error('[Webhook] Error in conversation handler:', error)
+        await sendMessage(from.id, 'Something went wrong. Please try again.')
+      }
+      return NextResponse.json({ ok: true })
+    }
+
+    // Check if user is waiting for email input (only if NOT in conversation)
     if (pendingEmailUsers.has(userId) && !command.startsWith('/')) {
       // User is providing their email
       const email = text!.trim()
@@ -4617,25 +4637,6 @@ Please enter a valid email address.
       } else {
         // Show all payment buttons (normal flow)
         await showPaymentButtons(from, email)
-      }
-      return NextResponse.json({ ok: true })
-    }
-
-    // Check if user is in conversation flow (MT5 setup or promo creation)
-    const conversationState = await getConversationState(userId)
-    if (conversationState && !command.startsWith('/')) {
-      // Check if it's a promo conversation step
-      const promoSteps = ['promo_code', 'promo_name', 'plan_type', 'duration', 'is_free', 'has_copier', 'amount', 'expiry']
-      try {
-        if (promoSteps.includes(conversationState.step)) {
-          console.log('[Webhook] Calling handlePromoConversation for step:', conversationState.step)
-          await handlePromoConversation(from, text!)
-        } else {
-          await handleMt5Conversation(from, text!)
-        }
-      } catch (error) {
-        console.error('[Webhook] Error in conversation handler:', error)
-        await sendMessage(from.id, 'Something went wrong. Please try again.')
       }
       return NextResponse.json({ ok: true })
     }
