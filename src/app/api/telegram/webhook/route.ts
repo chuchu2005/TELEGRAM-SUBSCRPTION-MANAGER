@@ -408,11 +408,6 @@ Basic plan (₦10,000) = You copy trades yourself (no bot)
 
 ━━━━━━━━━━━━━━━━━━━`
 
-  await sendMessage(user.id, message)
-
-  // Small delay to ensure order
-  await new Promise(resolve => setTimeout(resolve, 500))
-
   // Second message: Plan options + details
   const message2 = `💳 <b>Choose Your Plan:</b>
 
