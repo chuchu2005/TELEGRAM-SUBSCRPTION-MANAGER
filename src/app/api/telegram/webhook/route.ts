@@ -511,7 +511,7 @@ Choose a plan to get instant access to our VIP community:
   await sendMessageWithKeyboard(user.id, message, {
     inline_keyboard: [
       [
-        { text: '🎁 Start Your FREE 24-Hour Trial! 🎁', callback_data: 'start_trial' }
+        { text: '🎁 Start Your FREE Trial Now! 🎁', callback_data: 'start_trial' }
       ]
     ]
   })
