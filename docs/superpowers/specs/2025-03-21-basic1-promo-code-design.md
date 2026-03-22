@@ -66,10 +66,164 @@ When admin sends `/promo`, they see:
 
 ## Implementation
 
+### Current System Issue
+The current `/promo` command is **broken** - it doesn't check the PromoCode database. Instead, it just treats promo codes as payment references and calls `handleVerify()`, which fails because promo codes aren't valid Paystack references.
+
+**We need to fix the promo code redemption logic first.**
+
 ### Changes Required
 
-#### 1. Database Entry
-Add new document to `PromoCode` collection in MongoDB:
+#### 1. Fix Promo Code Redemption Logic
+File: `src/app/api/telegram/webhook/route.ts`
+
+Location: `handlePromo()` function, around line 1795-1843
+
+**Current broken code:**
+```typescript
+} else {
+  // Treat the promo code as a reference for 'basic' plan verification
+  // This is how the existing logic was structured
+  await handleVerify(from, args[0], 'basic')
+}
+```
+
+**New fixed code:**
+```typescript
+} else {
+  // Properly validate and redeem promo code from database
+  await redeemPromoCode(from, args[0])
+}
+```
+
+**Add new function `redeemPromoCode()`:**
+```typescript
+async function redeemPromoCode(user: TelegramUser, promoCode: string): Promise<void> {
+  const userId = user.id.toString()
+  const code = promoCode.trim().toLowerCase()
+
+  // 1. Check if promo code exists in database
+  const promo = await prisma.promoCode.findUnique({
+    where: { code: code }
+  })
+
+  if (!promo) {
+    await sendMessage(user.id, `❌ <b>Invalid Promo Code</b>
+
+The promo code "${promoCode}" doesn't exist.
+
+Please check the code and try again, or contact admin.`)
+    return
+  }
+
+  // 2. Check if promo has expired
+  if (promo.expiresAt && promo.expiresAt < new Date()) {
+    await sendMessage(user.id, `❌ <b>Promo Code Expired</b>
+
+This promo code has expired.
+
+Please contact admin for a new code.`)
+    return
+  }
+
+  // 3. Check if usage limit reached
+  if (promo.usageLimit && promo.usageCount >= promo.usageLimit) {
+    await sendMessage(user.id, `❌ <b>Promo Code Fully Redeemed</b>
+
+This promo code has reached its usage limit.
+
+Please contact admin.`)
+    return
+  }
+
+  // 4. Check if user already used this code
+  const existingUsage = await prisma.subscription.findFirst({
+    where: {
+      telegramUserId: userId,
+      promoCode: code
+    }
+  })
+
+  if (existingUsage) {
+    await sendMessage(user.id, `❌ <b>Already Redeemed</b>
+
+You've already used this promo code!
+
+Each promo code can only be used once.`)
+    return
+  }
+
+  // 5. Check if user has active subscription
+  const activeSub = await prisma.subscription.findFirst({
+    where: {
+      telegramUserId: userId,
+      expiresAt: { gte: new Date() }
+    }
+  })
+
+  if (activeSub) {
+    await sendMessage(user.id, `⚠️ <b>Active Subscription Found</b>
+
+You already have an active subscription!
+
+Please wait for it to expire before using a promo code.`)
+    return
+  }
+
+  // 6. Create the subscription
+  const expiresAt = new Date()
+  expiresAt.setDate(expiresAt.getDate() + promo.durationDays)
+
+  await prisma.subscription.create({
+    data: {
+      telegramUserId: userId,
+      telegramUsername: user.username || null,
+      telegramName: user.first_name || null,
+      planType: promo.planType as PlanType,
+      startDate: new Date(),
+      expiresAt: expiresAt,
+      promoCode: code,
+      hasCopierAccess: promo.hasCopierAccess
+    }
+  })
+
+  // 7. Increment promo usage count
+  await prisma.promoCode.update({
+    where: { id: promo.id },
+    data: { usageCount: { increment: 1 } }
+  })
+
+  // 8. Send success message and invite link
+  const inviteLink = await generateInviteLink(user.id.toString())
+
+  await sendMessage(user.id, `✅ <b>Promo Code Redeemed Successfully!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+🎁 <b>${promo.name}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>✅ You have ${promo.durationDays} days of ${PLANS[promo.planType as PlanType].name}!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>📋 Invite Link:</b>
+
+${inviteLink}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Important:</b>
+• This link expires in 24 hours
+• Join now to start receiving VIP signals
+• Your access expires on ${expiresAt.toLocaleDateString()}
+
+Enjoy! 🎉`)
+}
+```
+
+#### 2. Database Entry
+Add new document to `PromoCode` collection in MongoDB (using MongoDB shell or admin panel):
 
 ```javascript
 {
@@ -79,8 +233,9 @@ Add new document to `PromoCode` collection in MongoDB:
   durationDays: 7,
   hasCopierAccess: false,
   isFree: true,
-  expiresAt: new Date("2099-12-31T23:59:59Z"), // Far future
-  usageLimit: null,
+  amountKobo: null,
+  expiresAt: new Date("2099-12-31T23:59:59Z"), // Far future = never expires
+  usageLimit: null, // Unlimited total uses
   perUserLimit: 1,
   usageCount: 0,
   createdAt: new Date(),
@@ -88,7 +243,7 @@ Add new document to `PromoCode` collection in MongoDB:
 }
 ```
 
-#### 2. Update Admin View
+#### 3. Update Admin View
 File: `src/app/api/telegram/webhook/route.ts`
 
 Location: `handlePromo()` function, around line 1806
