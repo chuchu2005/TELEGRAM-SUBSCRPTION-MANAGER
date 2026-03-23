@@ -1790,6 +1790,135 @@ async function handleVerifyPromo(user: TelegramUser, reference: string): Promise
 }
 
 /**
+ * Redeem a promo code from database
+ * Properly validates and creates subscription for free promo codes
+ */
+async function redeemPromoCode(user: TelegramUser, promoCodeInput: string): Promise<void> {
+  const userId = user.id.toString()
+  const code = promoCodeInput.trim().toLowerCase()
+
+  // 1. Check if promo code exists in database
+  const promo = await prisma.promoCode.findUnique({
+    where: { code: code }
+  })
+
+  if (!promo) {
+    await sendMessage(user.id, `❌ <b>Invalid Promo Code</b>
+
+The promo code "${promoCodeInput}" doesn't exist.
+
+Please check the code and try again, or contact admin.`)
+    return
+  }
+
+  // 2. Check if promo is active
+  if (!promo.isActive) {
+    await sendMessage(user.id, `❌ <b>Promo Code Inactive</b>
+
+This promo code is currently inactive.
+
+Please contact admin.`)
+    return
+  }
+
+  // 3. Check if promo has expired
+  if (promo.expiresAt && promo.expiresAt < new Date()) {
+    await sendMessage(user.id, `❌ <b>Promo Code Expired</b>
+
+This promo code has expired.
+
+Please contact admin for a new code.`)
+    return
+  }
+
+  // 4. Check if usage limit reached
+  if (promo.usageLimit && promo.usageCount >= promo.usageLimit) {
+    await sendMessage(user.id, `❌ <b>Promo Code Fully Redeemed</b>
+
+This promo code has reached its usage limit.
+
+Please contact admin.`)
+    return
+  }
+
+  // 5. Check if user has active subscription
+  const activeSub = await prisma.subscription.findFirst({
+    where: {
+      telegramUserId: userId,
+      expiresAt: { gte: new Date() }
+    }
+  })
+
+  if (activeSub) {
+    await sendMessage(user.id, `⚠️ <b>Active Subscription Found</b>
+
+You already have an active ${PLANS[activeSub.planType as PlanType].name} plan!
+
+Your access expires on ${activeSub.expiresAt.toLocaleDateString()}.
+
+Please wait for it to expire before using a promo code.`)
+    return
+  }
+
+  // 7. Create the subscription
+  const startDate = new Date()
+  const expiresAt = new Date(startDate)
+  expiresAt.setDate(expiresAt.getDate() + promo.durationDays)
+
+  await prisma.subscription.create({
+    data: {
+      telegramUserId: userId,
+      telegramUsername: user.username || null,
+      telegramName: user.first_name || null,
+      paystackRef: `PROMO_${code.toUpperCase()}_${Date.now()}`,
+      amountKobo: promo.isFree ? 0 : (promo.amountKobo || 0),
+      planType: promo.planType as PlanType,
+      expiresAt: expiresAt,
+      hasCopierAccess: promo.hasCopierAccess
+    }
+  })
+
+  // 8. Increment promo usage count
+  await prisma.promoCode.update({
+    where: { id: promo.id },
+    data: { usageCount: { increment: 1 } }
+  })
+
+  // 9. Generate invite link
+  const inviteLink = await createInviteLink()
+
+  // 10. Send success message and invite link
+  await sendMessage(user.id, `✅ <b>Promo Code Redeemed Successfully!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+🎁 <b>${promo.name}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>✅ You have ${promo.durationDays} days of ${PLANS[promo.planType as PlanType].name}!</b>
+
+<b>📅 Expires:</b> ${expiresAt.toLocaleDateString()}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>📋 Invite Link:</b>
+
+${inviteLink}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>⚠️ Important:</b>
+• This link expires in 24 hours
+• Join the VIP channel now to start receiving signals
+• Your access will automatically expire on ${expiresAt.toLocaleDateString()}
+
+━━━━━━━━━━━━━━━━━━━
+
+Enjoy! 🎉`)
+}
+
+/**
  * Handle /promo command
  */
 async function handlePromo(from: TelegramUser, args: string[]): Promise<void> {
@@ -1807,6 +1936,7 @@ async function handlePromo(from: TelegramUser, args: string[]): Promise<void> {
 ✨ <b>EXTRA2</b> - 2 Weeks Premium + Meta Copier (FREE)
 ✨ <b>VIP</b> - 1 Week Basic Only (FREE)
 ✨ <b>DISCOUNT</b> - 1 Week Basic (₦3,000) - Generates payment link
+✨ <b>BASIC1</b> - 1 Week Basic (FREE) [NEW]
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -1815,6 +1945,7 @@ async function handlePromo(from: TelegramUser, args: string[]): Promise<void> {
 /promo EXTRA2
 /promo VIP
 /promo DISCOUNT
+/promo BASIC1
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -1837,9 +1968,8 @@ To redeem a promo code, use:
 <i>Contact admin if you have questions!</i>`)
     }
   } else {
-    // Treat the promo code as a reference for 'basic' plan verification
-    // This is how the existing logic was structured
-    await handleVerify(from, args[0], 'basic')
+    // Properly validate and redeem promo code from database
+    await redeemPromoCode(from, args[0])
   }
 }
 
