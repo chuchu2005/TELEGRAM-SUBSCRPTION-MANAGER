@@ -133,6 +133,12 @@ Bot: "✅ Duration set to 15 days" [Keyboard remains visible]
 **Example:**
 ```typescript
 function areAllRequiredFieldsSet(state: PromoCreationState): boolean {
+  // Must not be waiting for custom input
+  if (state.awaitingCustomInput) {
+    return false
+  }
+
+  // All required fields must be set
   return !!(
     state.planType &&
     state.durationDays &&
@@ -179,7 +185,7 @@ function areAllRequiredFieldsSet(state: PromoCreationState): boolean {
 ```typescript
 [
   { text: '❌ No Copier', callback_data: 'promo_copier_no' },
-  { text: '✅ With Copier', callback_data: promo_copier_yes' }
+  { text: '✅ With Copier', callback_data: 'promo_copier_yes' }
 ]
 ```
 
@@ -255,35 +261,34 @@ function areAllRequiredFieldsSet(state: PromoCreationState): boolean {
 7. **Admin:** `Summer Sale 2025`
 8. **Bot:** Creates promo code with displayName: "Summer Sale 2025"
 
-### Button State Management
-- Bot tracks all selections in conversation state
-- No visual feedback on buttons (simple and reliable)
-- Final summary shown before asking for code name
-
 ## Input Validation
 
 ### Code Name
 - **Format:** Letters and numbers only, 3-20 chars
-- **Validation:** `/^[a-z0-9]{3,20}$/i` (case-insensitive validation)
-- **Transform:** Convert to lowercase, remove spaces
+- **Validation:** Accepts both uppercase and lowercase input (e.g., "SUMMER2025", "summer2025", "SuMmEr2025")
+- **Transform:** Convert to lowercase for storage, remove spaces and special chars
 - **Uniqueness:** Check database for duplicates (case-insensitive check)
+- **User-facing:** Store as lowercase in database, redemption works with any case
 
 ### Custom Values
 - **Duration:** 1-365 days (number)
 - **Usage Limit:** 1-1000 users (number)
 - **Display Name:** 1-100 chars (optional)
 
-### Required Fields
+### Required Button Selections
+These must be selected via inline keyboard buttons:
 - Plan type
 - Duration
 - Price (free/paid)
 - Copier access
 - Expiry
 - Usage limit
-- Code name
+
+### Final Input (Text Message)
+- Code name (entered after all button selections complete)
 
 ### Optional Fields
-- Display name (user-friendly description)
+- Display name (user-friendly description, collected after code name if "✅ Add Name" clicked)
 
 ## Error Handling
 
@@ -311,29 +316,66 @@ function areAllRequiredFieldsSet(state: PromoCreationState): boolean {
 ### Current Bug
 ```typescript
 // Creation stores as UPPERCASE
-code: data.code  // "BASIC1"
+await prisma.promoCode.create({
+  data: {
+    code: data.code,  // "BASIC1"
+    // ... other fields
+  }
+})
 
 // Redemption searches as lowercase
 const code = promoCodeInput.trim().toLowerCase()  // "basic1"
+
+const promo = await prisma.promoCode.findUnique({
+  where: { code: code }  // Looking for "basic1"
+})
 
 // Database has "BASIC1", searching for "basic1" → Not found ❌
 ```
 
 ### Fix
 ```typescript
-// Store as LOWERCASE
-code: data.code.toLowerCase()  // "basic1"
+// Store as LOWERCASE (in creation)
+await prisma.promoCode.create({
+  data: {
+    code: data.code.toLowerCase(),  // "basic1"
+    // ... other fields
+  }
+})
 
-// Redemption searches as lowercase
+// Redemption searches as lowercase (unchanged)
 const code = promoCodeInput.trim().toLowerCase()  // "basic1"
+
+const promo = await prisma.promoCode.findUnique({
+  where: { code: code }  // Looking for "basic1"
+})
 
 // Database has "basic1", searching for "basic1" → Found ✅
 ```
 
-### Impact
-- Users can type `/promo basic1`, `/promo BASIC1`, `/promo BaSiC1` - all work
-- Codes stored consistently as lowercase
-- No more case-sensitivity issues
+### Migration Strategy
+- **Existing codes:** No immediate migration needed - they remain uppercase in database
+- **Backward compatibility:** Update redemption logic to try lowercase first, then try case-insensitive search:
+  ```typescript
+  // Try exact match (lowercase) first
+  let promo = await prisma.promoCode.findUnique({
+    where: { code: code }
+  })
+
+  // If not found and code contains uppercase, try case-insensitive
+  if (!promo && code !== code.toLowerCase()) {
+    promo = await prisma.promoCode.findFirst({
+      where: {
+        code: {
+          equals: code,
+          mode: 'insensitive'  // Case-insensitive search
+        }
+      }
+    })
+  }
+  ```
+- **Future:** All new codes stored as lowercase
+- **Optional one-time cleanup:** Run migration script to convert existing uppercase codes to lowercase
 
 ## Testing
 
