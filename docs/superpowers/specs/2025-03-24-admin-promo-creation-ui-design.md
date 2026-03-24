@@ -7,7 +7,7 @@ Redesign the `/create_promo` command to use inline keyboard buttons for fast, in
 **Current Issues:**
 1. **Critical Bug:** Promo codes created as UPPERCASE, but redemption searches as lowercase → "Invalid promo code" error
 2. **Poor UX:** 7-step conversation flow is slow and tedious
-3. **Text-Based:** Requires typing back-and-forthruh for each field
+3. **Text-Based:** Requires typing back-and-forth for each field
 
 **User Impact:**
 - Admins can create codes but users can't redeem them
@@ -48,6 +48,101 @@ Admin → /create_promo → Bot checks permissions
   - `usageLimit`: number | null
   - `customDuration`: number | null
   - `customUsage`: number | null
+
+### TypeScript Interface
+```typescript
+interface PromoCreationState {
+  step: 'promo_selections' | 'promo_custom_duration' | 'promo_custom_usage' | 'promo_display_name'
+  planType?: 'basic' | 'biweekly' | 'monthly'
+  durationDays?: number
+  isFree?: boolean
+  hasCopierAccess?: boolean
+  displayName?: string | null
+  expiresAt?: Date
+  usageLimit?: number | null
+  awaitingCustomInput?: boolean
+}
+```
+
+### Callback Data Structure
+
+All callback data follows the pattern: `promo_<category>_<value>`
+
+**Complete list:**
+- `promo_plan_basic`, `promo_plan_biweekly`, `promo_plan_monthly`
+- `promo_duration_7`, `promo_duration_14`, `promo_duration_30`, `promo_duration_custom`
+- `promo_price_free`, `promo_price_paid`
+- `promo_copier_no`, `promo_copier_yes`
+- `promo_name_yes`, `promo_name_skip`
+- `promo_expiry_90`, `promo_expiry_180`, `promo_expiry_365`, `promo_expiry_never`
+- `promo_limit_unlimited`, `promo_limit_50`, `promo_limit_100`, `promo_limit_custom`
+
+### Custom Value Flow
+
+When admin clicks a "✏️ Custom" button:
+
+1. **Immediate Prompt:** Bot sends a text message immediately asking for the custom value
+2. **State Update:** Set `awaitingCustomInput: true` in conversation state
+3. **Store Context:** Track which field is being customized (duration vs usage limit)
+4. **Validation:**
+   - Duration: Must be number between 1-365
+   - Usage Limit: Must be number between 1-1000
+5. **Error Handling:**
+   - Invalid input (non-number): "Please enter a valid number"
+   - Out of range: Show valid range and ask again
+   - Cancel: Send /cancel to exit flow
+6. **Re-selection:** Admin can click a different preset button to override custom value
+7. **Final Confirmation:** Show selected custom value before asking for code name
+
+**Example interaction:**
+```
+Admin: [Clicks ✏️ Custom on Duration row]
+Bot: "Enter custom duration (1-365 days):"
+Admin: "15"
+Bot: "✅ Duration set to 15 days" [Keyboard remains visible]
+```
+
+### Button State Management
+
+**Strategy:** Use internal state tracking without editing keyboard buttons
+
+1. **Track Selections:** Store all selections in conversation state
+2. **No Visual Feedback:** Buttons do NOT change appearance (no ✅ indicators)
+3. **Final Summary:** When all required fields selected, show summary before asking for code name
+4. **Deselection:** Clicking same button twice has no effect (idempotent)
+5. **Change Selection:** Clicking different option in same category replaces previous selection
+
+**Rationale:** Editing inline keyboard messages requires complex message updates and can be buggy. Simple state tracking is more reliable.
+
+### Completion Trigger Logic
+
+**When does bot ask for code name?**
+
+1. **Check After Every Button Click:** After each callback, validate state
+2. **Required Fields Must Be Set:**
+   - `planType` is defined
+   - `durationDays` is defined
+   - `isFree` is defined
+   - `hasCopierAccess` is defined
+   - `expiresAt` is defined
+   - `usageLimit` is defined
+3. **Optional Fields:**
+   - `displayName` can be null (if "Skip Name" clicked)
+4. **Action:** When all required fields present, delete keyboard message and prompt for code name
+
+**Example:**
+```typescript
+function areAllRequiredFieldsSet(state: PromoCreationState): boolean {
+  return !!(
+    state.planType &&
+    state.durationDays &&
+    state.isFree !== undefined &&
+    state.hasCopierAccess !== undefined &&
+    state.expiresAt &&
+    state.usageLimit !== undefined
+  )
+}
+```
 
 ## Inline Keyboard Layout
 
@@ -121,29 +216,57 @@ Admin → /create_promo → Bot checks permissions
 ### Complete User Journey
 
 1. **Admin:** `/create_promo`
-2. **Bot:** Validates admin, shows keyboard
+2. **Bot:** Validates admin, shows keyboard with 7 rows
 3. **Admin:** Clicks [💎 Basic]
-4. **Bot:** Updates state, shows ✅ on selected button
+4. **Bot:** Updates state (no visible change to buttons)
 5. **Admin:** Clicks [7 days]
 6. **Bot:** Updates state
 7. **Admin:** Clicks [🎁 FREE]
-8. **Bot:** Updates state, checks all required fields selected
-9. **Bot:** "✅ All options selected! Name your promo code:"
-10. **Admin:** `summer2025`
-11. **Bot:** Creates promo code in DB (lowercase), sends confirmation
+8. **Bot:** Updates state
+9. **Admin:** Clicks [❌ No Copier]
+10. **Bot:** Updates state
+11. **Admin:** Clicks [⏭️ Skip Name] (optional - could also click [✅ Add Name])
+12. **Bot:** Updates state, sets displayName to null
+13. **Admin:** Clicks [📅 90 days]
+14. **Bot:** Updates state, sets expiresAt to 90 days from now
+15. **Admin:** Clicks [♾️ Unlimited]
+16. **Bot:** Updates state, sets usageLimit to null
+17. **Bot:** Checks state - all required fields present
+18. **Bot:** Deletes keyboard message, sends: "✅ All options selected! Please enter your promo code name:"
+19. **Admin:** `summer2025`
+20. **Bot:** Creates promo code in DB (lowercase: "summer2025"), sends confirmation with details
+
+**Alternative Journey with Custom Duration:**
+
+1. **Admin:** Clicks [✏️ Custom] on Duration row
+2. **Bot:** Sends text message: "Enter custom duration (1-365 days):"
+3. **Admin:** `15`
+4. **Bot:** Validates, stores durationDays: 15, sends: "✅ Duration set to 15 days"
+5. **Admin:** Continues with other selections...
+
+**Alternative Journey with Display Name:**
+
+1. **Admin:** Clicks [✅ Add Name] on Display Name row
+2. **Bot:** Stores flag that display name will be collected
+3. **Admin:** Completes all other selections
+4. **Bot:** "✅ All options selected! Please enter your promo code name:"
+5. **Admin:** `summer2025`
+6. **Bot:** "Great! Now enter a display name for this promo code (1-100 chars):"
+7. **Admin:** `Summer Sale 2025`
+8. **Bot:** Creates promo code with displayName: "Summer Sale 2025"
 
 ### Button State Management
-- Selected buttons show ✅ indicator
-- Last selected option in each category is highlighted
 - Bot tracks all selections in conversation state
+- No visual feedback on buttons (simple and reliable)
+- Final summary shown before asking for code name
 
 ## Input Validation
 
 ### Code Name
 - **Format:** Letters and numbers only, 3-20 chars
-- **Validation:** `/^[A-Z0-9]{3,20}$/`
-- **Transform:** Convert to uppercase, remove spaces
-- **Uniqueness:** Check database for duplicates
+- **Validation:** `/^[a-z0-9]{3,20}$/i` (case-insensitive validation)
+- **Transform:** Convert to lowercase, remove spaces
+- **Uniqueness:** Check database for duplicates (case-insensitive check)
 
 ### Custom Values
 - **Duration:** 1-365 days (number)
@@ -159,11 +282,14 @@ Admin → /create_promo → Bot checks permissions
 - Usage limit
 - Code name
 
+### Optional Fields
+- Display name (user-friendly description)
+
 ## Error Handling
 
 ### Validation Errors
-1. **Invalid code format:** "Code must be 3-20 characters, letters and numbers only. Example: SUMMER2025"
-2. **Code exists:** "Code 'SUMMER2025' already exists. Try a different code."
+1. **Invalid code format:** "Code must be 3-20 characters, letters and numbers only. Example: summer2025"
+2. **Code exists:** "Code 'summer2025' already exists. Try a different code."
 3. **Missing selections:** "Please complete all selections first."
 
 ### Database Errors
@@ -172,10 +298,13 @@ Admin → /create_promo → Bot checks permissions
 - Clear conversation state on error
 
 ### Edge Cases
-- **Cancel mid-flow:** Clean up conversation state, allow restart
+- **Cancel mid-flow:** Clean up conversation state, allow restart (send /cancel)
 - **Custom value no input:** Ask again with example
 - **Duplicate code:** Offer to show existing code details
-- **Code with spaces:** Auto-strip and uppercase (e.g., "summer 2025" → "SUMMER2025")
+- **Code with spaces:** Auto-strip and convert to lowercase (e.g., "summer 2025" → "summer2025")
+- **Unexpected text messages:** While keyboard is displayed, ignore non-cancel text messages with hint: "Please use the buttons above or send /cancel to exit"
+- **Admin clicks same button twice:** No effect (idempotent)
+- **Admin switches to preset after choosing custom:** Preset value overrides custom value
 
 ## Bug Fix: Case-Insensitive Promo Codes
 
@@ -224,11 +353,13 @@ const code = promoCodeInput.trim().toLowerCase()  // "basic1"
 - [ ] Check MongoDB → Code stored as lowercase
 
 #### Custom Values
-- [ ] Click "✏️ Custom" duration → Ask for number
-- [ ] Type "5" → Validates and stores
-- [ ] Click "✏️ Custom" usage → Ask for number
-- [ ] Type "25" → Validates and stores
-- [ ] Click "✅ Add Name" → Ask for name
+- [ ] Click "✏️ Custom" duration → Bot asks for number
+- [ ] Type "5" → Validates, stores, confirms with message
+- [ ] Click "✏️ Custom" usage → Bot asks for number
+- [ ] Type "25" → Validates, stores, confirms with message
+- [ ] Click preset after custom → Preset overrides custom
+- [ ] Click "✅ Add Name" → Completes selections, asks for code
+- [ ] Type code → Bot then asks for display name
 - [ ] Type "Summer Sale" → Stores display name
 
 #### Redemption Flow
@@ -241,9 +372,11 @@ const code = promoCodeInput.trim().toLowerCase()  // "basic1"
 #### Error Cases
 - [ ] Try to create duplicate code → Error message
 - [ ] Try invalid code format → Error message
-- [ ] Cancel mid-creation → State cleared
+- [ ] Cancel mid-creation with /cancel → State cleared
+- [ ] Send random text while keyboard visible → Hint message
 - [ ] Create code with 0 days → Validation error
 - [ ] Create code with 1001 days → Validation error
+- [ ] Enter "abc" for custom duration → Validation error
 
 ### Success Criteria
 ✅ Promo codes stored as lowercase in database
