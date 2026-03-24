@@ -24,7 +24,7 @@ Replace conversation flow with inline keyboard buttons. All options visible at o
 2. **`handlePromoButtonCallback()`** - Processes button clicks
 3. **`showPromoCreationKeyboard()`** - Displays inline keyboard
 4. **State Management:** Uses existing conversation state system
-5. **Database:** MongoDB `PromoCode` collection with lowercase codes
+5. **Database:** MongoDB with Prisma ORM (`prisma.promoCode` operations)
 
 ### Data Flow
 ```
@@ -61,6 +61,7 @@ interface PromoCreationState {
   expiresAt?: Date
   usageLimit?: number | null
   awaitingCustomInput?: boolean
+  customInputType?: 'duration' | 'usage' | null  // Tracks which custom value is being collected
 }
 ```
 
@@ -77,12 +78,20 @@ All callback data follows the pattern: `promo_<category>_<value>`
 - `promo_expiry_90`, `promo_expiry_180`, `promo_expiry_365`, `promo_expiry_never`
 - `promo_limit_unlimited`, `promo_limit_50`, `promo_limit_100`, `promo_limit_custom`
 
+**Callback Handler Mapping:**
+The `handlePromoButtonCallback()` function parses callback_data and updates conversation state:
+- Extract category and value from callback_data (e.g., `promo_plan_basic` → category: `plan`, value: `basic`)
+- Update corresponding state field (e.g., `state.planType = 'basic'`)
+- Check if all required fields are set after each update
+- If all required fields set, delete keyboard and prompt for code name
+- If custom value selected, set `awaitingCustomInput: true` and prompt for input
+
 ### Custom Value Flow
 
 When admin clicks a "✏️ Custom" button:
 
 1. **Immediate Prompt:** Bot sends a text message immediately asking for the custom value
-2. **State Update:** Set `awaitingCustomInput: true` in conversation state
+2. **State Update:** Set `awaitingCustomInput: true` and `customInputType` in conversation state
 3. **Store Context:** Track which field is being customized (duration vs usage limit)
 4. **Validation:**
    - Duration: Must be number between 1-365
@@ -90,9 +99,12 @@ When admin clicks a "✏️ Custom" button:
 5. **Error Handling:**
    - Invalid input (non-number): "Please enter a valid number"
    - Out of range: Show valid range and ask again
-   - Cancel: Send /cancel to exit flow
-6. **Re-selection:** Admin can click a different preset button to override custom value
-7. **Final Confirmation:** Show selected custom value before asking for code name
+6. **Cancel Handling:**
+   - Admin sends /cancel → Clear state, send "Promo code creation cancelled"
+   - Return to normal conversation state
+   - Keyboard message is deleted when /cancel is sent
+7. **Re-selection:** Admin can click a different preset button to override custom value (this clears `customInputType`)
+8. **Final Confirmation:** Show selected custom value before asking for code name
 
 **Example interaction:**
 ```
@@ -313,6 +325,11 @@ These must be selected via inline keyboard buttons:
 
 ## Bug Fix: Case-Insensitive Promo Codes
 
+### Location
+- **File:** `src/app/api/telegram/webhook/route.ts`
+- **Function:** `redeemPromoCode()` (called by `/promo` command handler)
+- **Current Bug:** Codes stored as uppercase but searched as lowercase
+
 ### Current Bug
 ```typescript
 // Creation stores as UPPERCASE
@@ -388,11 +405,11 @@ const promo = await prisma.promoCode.findUnique({
 - [ ] Click each duration → State updates
 - [ ] Click FREE/PAID → State updates
 - [ ] Click copier options → State updates
-- [ ] Click name skip/name add → State updates
+- [ ] Click skip name/add name → State updates
 - [ ] Click expiry options → State updates
 - [ ] Click usage limit → State updates
-- [ ] Type code name → Creates in database
-- [ ] Check MongoDB → Code stored as lowercase
+- [ ] Type code name → Creates in database via Prisma
+- [ ] Check database → Code stored as lowercase
 
 #### Custom Values
 - [ ] Click "✏️ Custom" duration → Bot asks for number
@@ -433,13 +450,35 @@ const promo = await prisma.promoCode.findUnique({
 ## Implementation Notes
 
 ### Files to Modify
-1. **src/app/api/telegram/webhook/route.ts**
-   - Add `handleCreatePromoV2()` function
-   - Add `handlePromoButtonCallback()` function
-   - Add `showPromoCreationKeyboard()` function
-   - Update command handler to use new function
 
-2. **Database Schema:** No changes needed (PromoCode collection already exists)
+**File: `src/app/api/telegram/webhook/route.ts`**
+
+**Unit 1: Command Handler**
+- Update `/create_promo` command handler to call `handleCreatePromoV2()`
+- Add admin permission check
+
+**Unit 2: Keyboard Renderer**
+- Add `showPromoCreationKeyboard()` function
+- Returns inline keyboard with 7 rows of buttons
+- Each button has callback_data in format `promo_<category>_<value>`
+
+**Unit 3: Callback Handler**
+- Add `handlePromoButtonCallback()` function
+- Parse callback_data, update conversation state
+- Check if all required fields set, trigger code name prompt
+- Handle custom value selection by setting `awaitingCustomInput`
+
+**Unit 4: State Manager**
+- Add validation logic `areAllRequiredFieldsSet()`
+- Handle text input for custom values, code name, display name
+- Handle /cancel command to clean up state
+
+**Unit 5: Bug Fix in Redemption Flow**
+- Update `redeemPromoCode()` function (called by `/promo` command)
+- Add case-insensitive fallback query for existing uppercase codes
+- Ensure new codes stored as lowercase
+
+**Database Schema:** No changes needed (PromoCode collection already exists in Prisma schema)
 
 ### Backward Compatibility
 - Old `/create_promo` (conversation flow) can be removed
