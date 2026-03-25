@@ -1873,7 +1873,78 @@ Please wait for it to expire before using a promo code.`)
     return
   }
 
-  // 7. Create the subscription
+  // 6. For PAID promos, generate payment link instead of instant subscription
+  if (!promo.isFree && promo.amountKobo) {
+    // Generate payment link for discounted price
+    const planType = promo.planType as PlanType
+    const amountKobo = promo.amountKobo
+
+    // Get user email for payment
+    const email = `${user.username || 'user'}@pearsignals.com`
+
+    try {
+      // Generate Paystack payment link
+      const response = await fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/payment/link`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          amountKobo,
+          planType,
+          metadata: { promoCode: code }
+        })
+      })
+
+      const paymentData = await response.json()
+
+      if (!paymentData.success) {
+        throw new Error('Failed to generate payment link')
+      }
+
+      // Send payment link to user
+      const nairaPrice = `₦${(amountKobo / 100).toLocaleString()}`
+      await sendMessage(user.id, `💳 <b>Payment Required for Promo Code</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>🎁 ${promo.name || code.toUpperCase()}</b>
+
+You're purchasing <b>${PLANS[planType].name}</b> plan for <b>${nairaPrice}</b> (${promo.durationDays} days)
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>📧 Email:</b> ${email}
+
+<b>💰 Amount:</b> ${nairaPrice}
+
+━━━━━━━━━━━━━━━━━━━
+
+Tap below to pay securely:`)
+
+      await sendMessageWithKeyboard(user.id, '', {
+        inline_keyboard: [
+          [{ text: `💳 Pay ${nairaPrice} Now`, url: paymentData.authorizationUrl }]
+        ]
+      })
+
+      await sendMessage(user.id, `<b>⚠️ After payment:</b>
+Copy your <b>Reference Number</b> and send:
+
+<code>/verify_${planType} &lt;reference&gt;</code>
+
+Example: <code>/verify_${planType} XHY7ABC123</code>`)
+
+    } catch (error) {
+      console.error('[Promo Redemption] Failed to generate payment link:', error)
+      await sendMessage(user.id, `❌ <b>Payment Error</b>
+
+Failed to generate payment link. Please try again or contact admin.`)
+    }
+
+    return
+  }
+
+  // 7. Create the subscription (for FREE promos)
   const startDate = new Date()
   const expiresAt = new Date(startDate)
   expiresAt.setDate(expiresAt.getDate() + promo.durationDays)
@@ -2945,9 +3016,33 @@ Send /cancel to exit`)
       break
 
     case 'price':
-      await updateConversationData(userId, {
-        promoIsFree: value === 'free'
-      })
+      if (value === 'paid') {
+        await updateConversationData(userId, {
+          promoIsFree: false,
+          promoAwaitingCustomInput: true,
+          promoCustomInputType: 'paid_amount'
+        })
+        await sendMessage(user.id, `💵 <b>Discounted Price</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Enter the discounted price in kobo:
+
+<i>Current prices:</i>
+• Basic: ₦5,000 (500,000 kobo)
+• Bi-Weekly: ₦9,000 (900,000 kobo)
+• Monthly: ₦18,000 (1,800,000 kobo)
+
+<i>Enter the amount in kobo (e.g., 300000 for ₦3,000)</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+Send /cancel to exit`)
+      } else {
+        await updateConversationData(userId, {
+          promoIsFree: true
+        })
+      }
       break
 
     case 'copier':
@@ -3126,6 +3221,33 @@ Usage limit must be between 1 and 1000 users.
 ━━━━━━━━━━━━━━━━━━━
 
 Continue selecting options or wait for code name prompt.`)
+    } else if (inputType === 'paid_amount') {
+      // Validate the amount (must be between 1000 kobo and 5,000,000 kobo)
+      if (value < 1000 || value > 5000000) {
+        await sendMessage(user.id, `❌ <b>Invalid Amount</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Amount must be between ₦10 and ₦50,000.
+
+<i>Enter amount in kobo (e.g., 300000 for ₦3,000)</i>
+
+━━━━━━━━━━━━━━━━━━━`)
+        return
+      }
+
+      const nairaAmount = value / 100
+      await updateConversationData(userId, {
+        promoAmountKobo: value,
+        promoAwaitingCustomInput: false,
+        promoCustomInputType: null
+      })
+
+      await sendMessage(user.id, `✅ <b>Price set to ₦${nairaAmount.toLocaleString()}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Continue selecting options or wait for code name prompt.`)
     }
 
     return
@@ -3243,7 +3365,7 @@ async function createPromoCode(user: TelegramUser, code: string, data: any): Pro
         durationDays: data.promoDurationDays,
         hasCopierAccess: data.promoHasCopierAccess || false,
         isFree: data.promoIsFree,
-        amountKobo: data.promoIsFree ? null : 0,
+        amountKobo: data.promoIsFree ? null : (data.promoAmountKobo || 0),
         expiresAt: data.promoExpiresAt,
         usageLimit: data.promoUsageLimit,
         usageCount: 0,

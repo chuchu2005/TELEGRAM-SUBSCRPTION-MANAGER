@@ -129,8 +129,9 @@ model ConversationState {
   newPromoExpiresAt        DateTime? @map("newPromoExpiresAt") // Promo expiry date
   newPromoUsageLimit       Int?     @map("newPromoUsageLimit") // Usage limit
   newPromoAwaitingCustomInput Boolean? @map("newPromoAwaitingCustomInput") // Waiting for custom input
-  newPromoCustomInputType  String?  @map("newPromoCustomInputType") // "duration" or "usage"
+  newPromoCustomInputType  String?  @map("newPromoCustomInputType") // "duration", "usage", or "paid_amount"
   newPromoCode             String?  @map("newPromoCode") // Temporarily stores code name during display name collection
+  newPromoAmountKoby       Int?     @map("newPromoAmountKobo") // Discounted price for paid promos
 
   // Session tracking
   createdAt        DateTime @default(now())

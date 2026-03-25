@@ -9,7 +9,7 @@ import { encryptPassword, decryptPassword } from './encryption'
 
 export type Mt5SetupStep = 'account_number' | 'password' | 'confirming'
 export type PromoStep = 'promo_code' | 'promo_name' | 'plan_type' | 'duration' | 'is_free' | 'has_copier' | 'amount' | 'expiry'
-export type PromoCreationStep = 'promo_selections' | 'promo_custom_duration' | 'promo_custom_usage' | 'promo_display_name'
+export type PromoCreationStep = 'promo_selections' | 'promo_custom_duration' | 'promo_custom_usage' | 'promo_display_name' | 'promo_paid_amount'
 export type ConversationStep = Mt5SetupStep | PromoStep | PromoCreationStep
 
 export interface ConversationStateData {
@@ -36,8 +36,9 @@ export interface ConversationStateData {
     promoExpiresAt?: Date
     promoUsageLimit?: number | null
     promoAwaitingCustomInput?: boolean
-    promoCustomInputType?: 'duration' | 'usage' | null
+    promoCustomInputType?: 'duration' | 'usage' | 'paid_amount' | null
     promoCode?: string  // Temporarily stores code name during display name collection
+    promoAmountKobo?: number  // Stores the discounted price for paid promos
   }
 }
 
@@ -77,6 +78,7 @@ export async function setConversationState(userId: string, state: ConversationSt
       newPromoAwaitingCustomInput: state.data.promoAwaitingCustomInput ?? null,
       newPromoCustomInputType: state.data.promoCustomInputType || null,
       newPromoCode: state.data.promoCode || null,
+      newPromoAmountKoby: state.data.promoAmountKobo || null,
       updatedAt: now,
       expiresAt
     },
@@ -105,6 +107,7 @@ export async function setConversationState(userId: string, state: ConversationSt
       newPromoAwaitingCustomInput: state.data.promoAwaitingCustomInput ?? null,
       newPromoCustomInputType: state.data.promoCustomInputType || null,
       newPromoCode: state.data.promoCode || null,
+      newPromoAmountKoby: state.data.promoAmountKobo || null,
       createdAt: now,
       updatedAt: now,
       expiresAt
@@ -175,7 +178,8 @@ export async function getConversationState(userId: string): Promise<Conversation
       promoUsageLimit: (state as any).newPromoUsageLimit ?? undefined,
       promoAwaitingCustomInput: (state as any).newPromoAwaitingCustomInput ?? undefined,
       promoCustomInputType: (state as any).newPromoCustomInputType || undefined,
-      promoCode: (state as any).newPromoCode || undefined
+      promoCode: (state as any).newPromoCode || undefined,
+      promoAmountKobo: (state as any).newPromoAmountKoby ?? undefined
     }
   }
 }
@@ -237,6 +241,7 @@ export async function updateConversationData(userId: string, data: Partial<Conve
   if (data.promoAwaitingCustomInput !== undefined) updateData.newPromoAwaitingCustomInput = data.promoAwaitingCustomInput
   if (data.promoCustomInputType !== undefined) updateData.newPromoCustomInputType = data.promoCustomInputType
   if (data.promoCode !== undefined) updateData.newPromoCode = data.promoCode
+  if (data.promoAmountKobo !== undefined) updateData.newPromoAmountKoby = data.promoAmountKobo
 
   await prisma.conversationState.update({
     where: { telegramUserId: userId },
