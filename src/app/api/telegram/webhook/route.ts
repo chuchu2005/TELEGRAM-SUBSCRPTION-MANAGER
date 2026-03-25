@@ -1976,7 +1976,7 @@ Failed to generate payment link. Please try again or contact admin.`)
 
 ━━━━━━━━━━━━━━━━━━━
 
-🎁 <b>${promo.name}</b>
+🎁 <b>${promo.name || code.toUpperCase()}</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
