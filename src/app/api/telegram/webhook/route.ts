@@ -2100,10 +2100,22 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
     // Check for promo codes
     const promoCode = cleanRef.toUpperCase()
 
-    // 1. Check for custom promo codes in database
-    const customPromo = await prisma.promoCode.findUnique({
+    // 1. Check for custom promo codes in database (case-insensitive)
+    let customPromo = await prisma.promoCode.findUnique({
       where: { code: promoCode }
     })
+
+    // If not found with exact match, try case-insensitive search
+    if (!customPromo) {
+      customPromo = await prisma.promoCode.findFirst({
+        where: {
+          code: {
+            equals: promoCode,
+            mode: 'insensitive'
+          }
+        }
+      })
+    }
 
     if (customPromo) {
       if (!customPromo.isActive || new Date(customPromo.expiresAt) < new Date()) {
@@ -2193,7 +2205,7 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
         })
         const promoData = await promoResponse.json()
         if (promoData.success) {
-          await sendMessageWithKeyboard(user.id, `🎁 <b>Special Offer!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n✨ <b>Get ${customPromo.durationDays} Days for ₦${(customPromo.amountKobo! / 100).toLocaleString()}!</b>`, {
+          await sendMessageWithKeyboard(user.id, `🎁 <b>${customPromo.name || promoCode}</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n✨ <b>Get ${customPromo.durationDays} Days for ₦${((customPromo.amountKobo || 0) / 100).toLocaleString()}!</b>`, {
             inline_keyboard: [[{ text: `🔥 Pay Now`, url: promoData.authorizationUrl }]]
           })
         }
