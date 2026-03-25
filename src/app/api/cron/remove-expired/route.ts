@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { banChatMember, sendMessage, sendMessageWithKeyboard } from '@/lib/telegram'
 import { removeUserMt5Account } from '@/lib/metacopier'
-import { ADMIN_ID } from '@/lib/config'
+import { ADMIN_ID, PLANS } from '@/lib/config'
 
 /**
  * GET handler for cron job to remove expired users
@@ -160,6 +160,11 @@ User has been removed from channel and MetaCopier.`)
           let expiryMessage = ''
 
           if (subscription.planType === 'trial') {
+            // Calculate 50% discount prices dynamically
+            const discountBasic = Math.round(PLANS.basic.amountKobo * 0.5 / 100)
+            const discountBiweekly = Math.round(PLANS.biweekly.amountKobo * 0.5 / 100)
+            const discountMonthly = Math.round(PLANS.monthly.amountKobo * 0.5 / 100)
+
             expiryMessage = `⏰ <b>Your Free Trial Has Ended!</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -191,10 +196,9 @@ Because you just completed your trial, we're giving you a 50% discount on ALL pl
 
 ━━━━━━━━━━━━━━━━━━━
 
-💎 Basic: ₦5,000 <s>(was ₦10,000)</s> - 7 days
-📊 Bi-Weekly: ₦8,500 <s>(was ₦17,000)</s> - 14 days
-📅 Monthly: ₦17,500 <s>(was ₦35,000)</s> - 30 days
-👑 Premium: ₦11,000 <s>(was ₦22,000)</s> - 14 days + Copier
+💎 Basic: ₦${discountBasic.toLocaleString()} <s>(was ₦${(PLANS.basic.amountKobo / 100).toLocaleString()})</s> - 7 days
+📊 Bi-Weekly: ₦${discountBiweekly.toLocaleString()} <s>(was ₦${(PLANS.biweekly.amountKobo / 100).toLocaleString()})</s> - 14 days
+📅 Monthly: ₦${discountMonthly.toLocaleString()} <s>(was ₦${(PLANS.monthly.amountKobo / 100).toLocaleString()})</s> - 30 days
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -213,10 +217,9 @@ Your access to Pear VIP signals channel has been removed.
 <b>Want to renew?</b>
 Just tap the button below to make a new payment!
 
-💎 Basic: ₦10,000 (7 days)
-📊 Bi-Weekly: ₦17,000 (14 days)
-📅 Monthly: ₦35,000 (30 days)
-👑 Premium: ₦22,000 (14 days + Copier)
+💎 Basic: ₦${(PLANS.basic.amountKobo / 100).toLocaleString()} (7 days)
+📊 Bi-Weekly: ₦${(PLANS.biweekly.amountKobo / 100).toLocaleString()} (14 days)
+📅 Monthly: ₦${(PLANS.monthly.amountKobo / 100).toLocaleString()} (30 days)
 
 ━━━━━━━━━━━━━━━━━━━
 
