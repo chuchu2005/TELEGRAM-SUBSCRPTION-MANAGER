@@ -7,6 +7,7 @@ import { createMt5Account, updateCopierSettings, removeUserMt5Account } from '@/
 import { encryptPassword, decryptPassword } from '@/lib/encryption'
 import { setConversationState, getConversationState, clearConversationState, advanceMt5SetupStep, advancePromoStep, updateConversationData, Mt5SetupStep } from '@/lib/conversation-state'
 import { settingsKeyboard, confirmSetupKeyboard, lotSizeKeyboard, maxLotKeyboard, maxLotTotalKeyboard, maxPositionsKeyboard } from '@/lib/telegram-keyboards'
+import { promoCreationKeyboard } from '@/lib/promo-keyboards'
 import { generateTradeStatistics, formatStatsMessage } from '@/lib/trade-stats'
 import { checkAndAwardReferralMilestone } from '@/lib/referral'
 import type { TelegramUpdate, TelegramUser } from '@/lib/telegram'
@@ -1797,10 +1798,22 @@ async function redeemPromoCode(user: TelegramUser, promoCodeInput: string): Prom
   const userId = user.id.toString()
   const code = promoCodeInput.trim().toLowerCase()
 
-  // 1. Check if promo code exists in database
-  const promo = await prisma.promoCode.findUnique({
+  // 1. Check if promo code exists in database (exact match - lowercase)
+  let promo = await prisma.promoCode.findUnique({
     where: { code: code }
   })
+
+  // 2. If not found, try case-insensitive search for backward compatibility
+  if (!promo && code !== promoCodeInput.trim()) {
+    promo = await prisma.promoCode.findFirst({
+      where: {
+        code: {
+          equals: code,
+          mode: 'insensitive'
+        }
+      }
+    })
+  }
 
   if (!promo) {
     await sendMessage(user.id, `❌ <b>Invalid Promo Code</b>
@@ -2797,6 +2810,500 @@ Send the promo code name (e.g., NEWYEAR, SUMMER2025)
 ━━━━━━━━━━━━━━━━━━━
 
 Type /cancel to exit`)
+}
+
+/**
+ * Check if all required promo creation fields are set
+ */
+function areAllRequiredFieldsSet(state: any): boolean {
+  // Must not be waiting for custom input
+  if (state.promoAwaitingCustomInput) {
+    return false
+  }
+
+  // All required fields must be set
+  return !!(
+    state.promoPlanType &&
+    state.promoDurationDays &&
+    state.promoIsFree !== undefined &&
+    state.promoHasCopierAccess !== undefined &&
+    state.promoExpiresAt &&
+    state.promoUsageLimit !== undefined
+  )
+}
+
+/**
+ * Handle /create_promo command - NEW VERSION with inline keyboards
+ * Admin creates custom promo codes using interactive buttons
+ */
+async function handleCreatePromoV2(user: TelegramUser): Promise<void> {
+  const userId = user.id.toString()
+
+  // Check if admin
+  if (user.id !== ADMIN_ID) {
+    await sendMessage(user.id, '❌ Only the admin can use this command.')
+    return
+  }
+
+  // Initialize conversation state for new promo creation flow
+  await setConversationState(userId, {
+    step: 'promo_selections',
+    data: {
+      promoPlanType: undefined,
+      promoDurationDays: undefined,
+      promoIsFree: undefined,
+      promoHasCopierAccess: undefined,
+      promoDisplayName: null,
+      promoExpiresAt: undefined,
+      promoUsageLimit: undefined,
+      promoAwaitingCustomInput: false,
+      promoCustomInputType: null,
+      promoCode: undefined
+    }
+  })
+
+  // Send welcome message with inline keyboard
+  const message = `🎁 <b>Create Promo Code</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Configure your promo code using the buttons below:</b>
+
+Select all options and I'll ask for the code name when complete.
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>💡 Tip: Click the buttons to make selections</i>`
+
+  await sendMessageWithKeyboard(user.id, message, promoCreationKeyboard())
+}
+
+/**
+ * Handle promo creation button callbacks
+ * Updates conversation state and checks for completion
+ */
+async function handlePromoButtonCallback(
+  user: TelegramUser,
+  callbackQueryId: string,
+  callbackData: string,
+  messageId: number
+): Promise<void> {
+  const userId = user.id.toString()
+
+  // Acknowledge the button click
+  await answerCallbackQuery(callbackQueryId)
+
+  // Get current state
+  const state = await getConversationState(userId)
+  if (!state || state.step !== 'promo_selections') {
+    await sendMessage(user.id, '❌ Invalid state. Please start over with /create_promo')
+    return
+  }
+
+  // Parse callback data
+  const parts = callbackData.split('_')
+  if (parts[0] !== 'promo' || parts.length < 3) {
+    console.error('[Promo Creation] Invalid callback data:', callbackData)
+    return
+  }
+
+  const category = parts[1] // plan, duration, price, copier, name, expiry, limit
+  const value = parts[2]    // basic, biweekly, monthly, 7, 14, etc.
+
+  console.log(`[Promo Creation] User ${userId} selected: ${category} = ${value}`)
+
+  // Update state based on category
+  switch (category) {
+    case 'plan':
+      await updateConversationData(userId, {
+        promoPlanType: value as 'basic' | 'biweekly' | 'monthly'
+      })
+      break
+
+    case 'duration':
+      if (value === 'custom') {
+        await updateConversationData(userId, {
+          promoAwaitingCustomInput: true,
+          promoCustomInputType: 'duration'
+        })
+        await sendMessage(user.id, `✏️ <b>Custom Duration</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Enter custom duration (1-365 days):
+
+<i>Example: 15</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+Send /cancel to exit`)
+      } else {
+        await updateConversationData(userId, {
+          promoDurationDays: parseInt(value)
+        })
+      }
+      break
+
+    case 'price':
+      await updateConversationData(userId, {
+        promoIsFree: value === 'free'
+      })
+      break
+
+    case 'copier':
+      await updateConversationData(userId, {
+        promoHasCopierAccess: value === 'yes'
+      })
+      break
+
+    case 'name':
+      await updateConversationData(userId, {
+        promoDisplayName: value === 'yes' ? '' : null // Empty string means "will collect later"
+      })
+      break
+
+    case 'expiry':
+      const now = new Date()
+      let expiresAt: Date
+
+      switch (value) {
+        case '90':
+          expiresAt = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
+          break
+        case '180':
+          expiresAt = new Date(now.getTime() + 180 * 24 * 60 * 60 * 1000)
+          break
+        case '365':
+          expiresAt = new Date(now.getTime() + 365 * 24 * 60 * 60 * 1000)
+          break
+        case 'never':
+          expiresAt = new Date('2099-12-31T23:59:59Z')
+          break
+        default:
+          return
+      }
+
+      await updateConversationData(userId, { promoExpiresAt: expiresAt })
+      break
+
+    case 'limit':
+      if (value === 'custom') {
+        await updateConversationData(userId, {
+          promoAwaitingCustomInput: true,
+          promoCustomInputType: 'usage'
+        })
+        await sendMessage(user.id, `✏️ <b>Custom Usage Limit</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Enter custom usage limit (1-1000 users):
+
+<i>Example: 25</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+Send /cancel to exit`)
+      } else {
+        await updateConversationData(userId, {
+          promoUsageLimit: value === 'unlimited' ? null : parseInt(value)
+        })
+      }
+      break
+
+    default:
+      console.error('[Promo Creation] Unknown category:', category)
+      return
+  }
+
+  // Check if all required fields are set
+  const updatedState = await getConversationState(userId)
+  if (updatedState && areAllRequiredFieldsSet(updatedState.data)) {
+    // Delete the keyboard message
+    try {
+      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/deleteMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chat_id: user.id,
+          message_id: messageId
+        })
+      })
+    } catch (error) {
+      console.error('[Promo Creation] Failed to delete keyboard message:', error)
+    }
+
+    // Prompt for code name
+    await sendMessage(user.id, `✅ <b>All options selected!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Please enter your promo code name:
+
+<i>3-20 characters, letters and numbers only</i>
+<i>Example: summer2025</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+Send /cancel to exit`)
+  }
+}
+
+/**
+ * Handle text input during promo creation flow
+ * Processes custom values, code name, and display name
+ */
+async function handlePromoCreationTextInput(user: TelegramUser, text: string): Promise<void> {
+  const userId = user.id.toString()
+  const trimmedText = text.trim()
+
+  // Get current state
+  const state = await getConversationState(userId)
+  if (!state) {
+    return // Not in promo creation flow
+  }
+
+  const data = state.data
+
+  // Handle custom input (duration or usage limit)
+  if (data.promoAwaitingCustomInput) {
+    const inputType = data.promoCustomInputType
+    const value = parseInt(trimmedText)
+
+    if (isNaN(value)) {
+      await sendMessage(user.id, `❌ <b>Invalid Input</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Please enter a valid number.
+
+━━━━━━━━━━━━━━━━━━━`)
+      return
+    }
+
+    if (inputType === 'duration') {
+      if (value < 1 || value > 365) {
+        await sendMessage(user.id, `❌ <b>Invalid Duration</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Duration must be between 1 and 365 days.
+
+━━━━━━━━━━━━━━━━━━━`)
+        return
+      }
+
+      await updateConversationData(userId, {
+        promoDurationDays: value,
+        promoAwaitingCustomInput: false,
+        promoCustomInputType: null
+      })
+
+      await sendMessage(user.id, `✅ <b>Duration set to ${value} days</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Continue selecting options or wait for code name prompt.`)
+    } else if (inputType === 'usage') {
+      if (value < 1 || value > 1000) {
+        await sendMessage(user.id, `❌ <b>Invalid Usage Limit</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Usage limit must be between 1 and 1000 users.
+
+━━━━━━━━━━━━━━━━━━━`)
+        return
+      }
+
+      await updateConversationData(userId, {
+        promoUsageLimit: value,
+        promoAwaitingCustomInput: false,
+        promoCustomInputType: null
+      })
+
+      await sendMessage(user.id, `✅ <b>Usage limit set to ${value} users</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Continue selecting options or wait for code name prompt.`)
+    }
+
+    return
+  }
+
+  // Handle code name input
+  if (state.step === 'promo_selections' && areAllRequiredFieldsSet(data)) {
+    // Validate code format
+    const codeValidation = /^[a-z0-9]{3,20}$/i
+    if (!codeValidation.test(trimmedText)) {
+      await sendMessage(user.id, `❌ <b>Invalid Code Format</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Code must be 3-20 characters, letters and numbers only.
+
+Example: summer2025
+
+━━━━━━━━━━━━━━━━━━━
+
+Please try again or send /cancel to exit.`)
+      return
+    }
+
+    // Convert to lowercase
+    const code = trimmedText.toLowerCase()
+
+    // Check if code already exists
+    const existing = await prisma.promoCode.findUnique({
+      where: { code: code }
+    })
+
+    if (existing) {
+      await sendMessage(user.id, `❌ <b>Code Already Exists</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+The code "${code}" already exists!
+
+Please try a different code or send /cancel to exit.`)
+      return
+    }
+
+    // Check if display name is needed
+    // Note: data.promoDisplayName === '' means "will collect display name later"
+    //       data.promoDisplayName === null means "skip display name"
+    if (data.promoDisplayName === '') {
+      // Prompt for display name
+      await updateConversationData(userId, { promoCode: code })
+      await setConversationState(userId, {
+        step: 'promo_display_name',
+        data: { ...data, promoCode: code }
+      })
+
+      await sendMessage(user.id, `✅ <b>Code "${code}" accepted!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Now enter a display name for this promo code (1-100 chars):
+
+<i>Example: Summer Sale 2025</i>
+
+━━━━━━━━━━━━━━━━━━━
+
+Send /cancel to exit`)
+      return
+    }
+
+    // Create promo code directly
+    await createPromoCode(user, code, data)
+    return
+  }
+
+  // Handle display name input
+  if (state.step === 'promo_display_name') {
+    if (trimmedText.length < 1 || trimmedText.length > 100) {
+      await sendMessage(user.id, `❌ <b>Invalid Display Name</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+Display name must be 1-100 characters.
+
+Please try again or send /cancel to exit.`)
+      return
+    }
+
+    const code = data.promoCode || ''
+    await updateConversationData(userId, { promoDisplayName: trimmedText })
+
+    // Create promo code
+    const updatedState = await getConversationState(userId)
+    if (updatedState) {
+      await createPromoCode(user, code, updatedState.data)
+    }
+    return
+  }
+}
+
+/**
+ * Create the promo code in database
+ */
+async function createPromoCode(user: TelegramUser, code: string, data: any): Promise<void> {
+  // Validate required fields
+  if (!data.promoPlanType) {
+    throw new Error('promoPlanType is required')
+  }
+
+  try {
+    // Create promo code
+    const promo = await prisma.promoCode.create({
+      data: {
+        code: code.toLowerCase(), // Store as lowercase
+        name: data.promoDisplayName || null,
+        planType: data.promoPlanType,
+        durationDays: data.promoDurationDays,
+        hasCopierAccess: data.promoHasCopierAccess || false,
+        isFree: data.promoIsFree,
+        amountKobo: data.promoIsFree ? null : 0,
+        expiresAt: data.promoExpiresAt,
+        usageLimit: data.promoUsageLimit,
+        usageCount: 0,
+        perUserLimit: 1,
+        isActive: true,
+        createdBy: user.id.toString()
+      }
+    })
+
+    // Clear conversation state
+    await clearConversationState(user.id.toString())
+
+    // Send success message
+    const planNames = {
+      basic: 'Basic',
+      biweekly: 'Bi-Weekly',
+      monthly: 'Monthly'
+    }
+
+    const durationText = data.promoDurationDays === 1 ? '1 day' : `${data.promoDurationDays} days`
+    const priceText = data.promoIsFree ? 'FREE' : `₦${((data.amountKobo || 0) / 100).toLocaleString()}`
+    const copierText = data.promoHasCopierAccess ? '✅ With Copier' : '❌ No Copier'
+    const expiryText = data.promoExpiresAt?.getFullYear() === 2099 ? 'Never' : data.promoExpiresAt?.toLocaleDateString()
+    const limitText = data.promoUsageLimit === null ? 'Unlimited' : `${data.promoUsageLimit} users`
+
+    await sendMessage(user.id, `✅ <b>Promo Code Created Successfully!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>📋 Code:</b> ${promo.code.toUpperCase()}
+<b>📝 Name:</b> ${promo.name || 'No display name'}
+
+<b>Plan:</b> ${planNames[promo.planType as keyof typeof planNames]}
+<b>Duration:</b> ${durationText}
+<b>Price:</b> ${priceText}
+<b>Copier:</b> ${copierText}
+<b>Expires:</b> ${expiryText}
+<b>Usage Limit:</b> ${limitText}
+<b>Per User:</b> Once
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>🎯 Users can redeem with:</b>
+/promo ${promo.code}
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>💡 Codes are case-insensitive: /promo ${promo.code.toUpperCase()} or /promo ${promo.code}</i>`)
+
+  } catch (error) {
+    console.error('[Promo Creation] Failed to create promo code:', error)
+    await sendMessage(user.id, `❌ <b>Failed to Create Promo Code</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+An error occurred. Please try again.`)
+
+    // Clear state on error
+    await clearConversationState(user.id.toString())
+  }
 }
 
 /**
@@ -4210,6 +4717,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ ok: true })
       }
 
+      // Handle promo creation callbacks
+      if (data.startsWith('promo_')) {
+        await handlePromoButtonCallback(from, id, data, message?.message_id || 0)
+        return NextResponse.json({ ok: true })
+      }
+
       // Answer the callback query to remove the loading state - use context-appropriate text
       const isVerifyCallback = data === 'verify_basic' || data === 'verify_biweekly' || data === 'verify_monthly' || data === 'verify_promo'
 
@@ -4604,10 +5117,15 @@ Or send /cancel to exit.`
     // This takes priority over email validation to avoid conflicts
     const conversationState = await getConversationState(userId)
     if (conversationState && !command.startsWith('/')) {
-      // Check if it's a promo conversation step
-      const promoSteps = ['promo_code', 'promo_name', 'plan_type', 'duration', 'is_free', 'has_copier', 'amount', 'expiry']
+      // Check if it's new promo creation flow
+      const newPromoSteps = ['promo_selections', 'promo_custom_duration', 'promo_custom_usage', 'promo_display_name']
+      // Check if it's old promo conversation step (deprecated)
+      const oldPromoSteps = ['promo_code', 'promo_name', 'plan_type', 'duration', 'is_free', 'has_copier', 'amount', 'expiry']
       try {
-        if (promoSteps.includes(conversationState.step)) {
+        if (newPromoSteps.includes(conversationState.step)) {
+          console.log('[Webhook] Calling handlePromoCreationTextInput for step:', conversationState.step)
+          await handlePromoCreationTextInput(from, text!)
+        } else if (oldPromoSteps.includes(conversationState.step)) {
           console.log('[Webhook] Calling handlePromoConversation for step:', conversationState.step)
           await handlePromoConversation(from, text!)
         } else {
@@ -4875,7 +5393,7 @@ Or send /cancel to exit.`
         break
 
       case '/create_promo':
-        await handleCreatePromo(from)
+        await handleCreatePromoV2(from)  // Use new version with inline keyboards
         break
 
       case '/list_promos':

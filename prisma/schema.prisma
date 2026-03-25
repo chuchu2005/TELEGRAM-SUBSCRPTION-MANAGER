@@ -105,12 +105,12 @@ model ConversationState {
   telegramUserId   String   @unique
 
   // MT5 Setup Flow State
-  step             String   // "account_number", "password", "confirming", "promo_code", "promo_name", "plan_type", "duration", "is_free", "has_copier", "amount", "expiry"
+  step             String   // "account_number", "password", "confirming", "promo_code", "promo_name", "plan_type", "duration", "is_free", "has_copier", "amount", "expiry", "promo_selections", "promo_custom_duration", "promo_custom_usage", "promo_display_name"
   accountNumber    String?
   password         String?  // Will be encrypted when stored
   server           String?
 
-  // Promo Code Creation Flow State
+  // Old Promo Code Creation Flow State (deprecated)
   promoCode        String?  @map("promoCode")   // The promo code being created
   promoName        String?  @map("promoName")   // Display name for promo
   promoPlanType    String?  @map("promoPlanType") // "basic", "premium", "biweekly", "monthly"
@@ -120,10 +120,24 @@ model ConversationState {
   promoHasCopier   Boolean? @map("promoHasCopier") @default(false)
   promoExpiresAt   DateTime? @map("promoExpiresAt") // Promo expiry date
 
+  // New Promo Creation Flow State
+  newPromoPlanType         String?  @map("newPromoPlanType") // "basic", "biweekly", "monthly"
+  newPromoDurationDays     Int?     @map("newPromoDurationDays") // Duration in days
+  newPromoIsFree           Boolean? @map("newPromoIsFree")
+  newPromoHasCopier        Boolean? @map("newPromoHasCopier")
+  newPromoDisplayName      String?  @map("newPromoDisplayName") // Display name for promo
+  newPromoExpiresAt        DateTime? @map("newPromoExpiresAt") // Promo expiry date
+  newPromoUsageLimit       Int?     @map("newPromoUsageLimit") // Usage limit
+  newPromoAwaitingCustomInput Boolean? @map("newPromoAwaitingCustomInput") // Waiting for custom input
+  newPromoCustomInputType  String?  @map("newPromoCustomInputType") // "duration" or "usage"
+  newPromoCode             String?  @map("newPromoCode") // Temporarily stores code name during display name collection
+
   // Session tracking
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
   expiresAt        DateTime // Expiration time (set in application code)
+
+  @@index([expiresAt])
 }
 
 model User {

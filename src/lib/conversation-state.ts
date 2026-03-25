@@ -9,7 +9,8 @@ import { encryptPassword, decryptPassword } from './encryption'
 
 export type Mt5SetupStep = 'account_number' | 'password' | 'confirming'
 export type PromoStep = 'promo_code' | 'promo_name' | 'plan_type' | 'duration' | 'is_free' | 'has_copier' | 'amount' | 'expiry'
-export type ConversationStep = Mt5SetupStep | PromoStep
+export type PromoCreationStep = 'promo_selections' | 'promo_custom_duration' | 'promo_custom_usage' | 'promo_display_name'
+export type ConversationStep = Mt5SetupStep | PromoStep | PromoCreationStep
 
 export interface ConversationStateData {
   step: ConversationStep
@@ -18,7 +19,7 @@ export interface ConversationStateData {
     accountNumber?: string
     password?: string
     server?: string
-    // Promo Creation Data
+    // Old Promo Creation Data (deprecated)
     code?: string
     name?: string | null
     planType?: string
@@ -26,6 +27,17 @@ export interface ConversationStateData {
     isFree?: boolean
     amountKobo?: number
     hasCopierAccess?: boolean
+    // New Promo Creation Data
+    promoPlanType?: 'basic' | 'biweekly' | 'monthly'
+    promoDurationDays?: number
+    promoIsFree?: boolean
+    promoHasCopierAccess?: boolean
+    promoDisplayName?: string | null
+    promoExpiresAt?: Date
+    promoUsageLimit?: number | null
+    promoAwaitingCustomInput?: boolean
+    promoCustomInputType?: 'duration' | 'usage' | null
+    promoCode?: string  // Temporarily stores code name during display name collection
   }
 }
 
@@ -46,6 +58,25 @@ export async function setConversationState(userId: string, state: ConversationSt
       accountNumber: state.data.accountNumber || null,
       password: encryptedPassword,
       server: state.data.server || null,
+      // Old promo fields
+      promoCode: state.data.code || null,
+      promoName: state.data.name || null,
+      promoPlanType: state.data.planType || null,
+      promoDurationDays: state.data.durationDays || null,
+      promoIsFree: state.data.isFree ?? null,
+      promoAmountKobo: state.data.amountKobo || null,
+      promoHasCopier: state.data.hasCopierAccess || null,
+      // New promo creation fields
+      newPromoPlanType: state.data.promoPlanType || null,
+      newPromoDurationDays: state.data.promoDurationDays || null,
+      newPromoIsFree: state.data.promoIsFree ?? null,
+      newPromoHasCopier: state.data.promoHasCopierAccess || null,
+      newPromoDisplayName: state.data.promoDisplayName || null,
+      newPromoExpiresAt: state.data.promoExpiresAt || null,
+      newPromoUsageLimit: state.data.promoUsageLimit ?? null,
+      newPromoAwaitingCustomInput: state.data.promoAwaitingCustomInput ?? null,
+      newPromoCustomInputType: state.data.promoCustomInputType || null,
+      newPromoCode: state.data.promoCode || null,
       updatedAt: now,
       expiresAt
     },
@@ -55,6 +86,25 @@ export async function setConversationState(userId: string, state: ConversationSt
       accountNumber: state.data.accountNumber || null,
       password: encryptedPassword,
       server: state.data.server || null,
+      // Old promo fields
+      promoCode: state.data.code || null,
+      promoName: state.data.name || null,
+      promoPlanType: state.data.planType || null,
+      promoDurationDays: state.data.durationDays || null,
+      promoIsFree: state.data.isFree ?? null,
+      promoAmountKobo: state.data.amountKobo || null,
+      promoHasCopier: state.data.hasCopierAccess || null,
+      // New promo creation fields
+      newPromoPlanType: state.data.promoPlanType || null,
+      newPromoDurationDays: state.data.promoDurationDays || null,
+      newPromoIsFree: state.data.promoIsFree ?? null,
+      newPromoHasCopier: state.data.promoHasCopierAccess || null,
+      newPromoDisplayName: state.data.promoDisplayName || null,
+      newPromoExpiresAt: state.data.promoExpiresAt || null,
+      newPromoUsageLimit: state.data.promoUsageLimit ?? null,
+      newPromoAwaitingCustomInput: state.data.promoAwaitingCustomInput ?? null,
+      newPromoCustomInputType: state.data.promoCustomInputType || null,
+      newPromoCode: state.data.promoCode || null,
       createdAt: now,
       updatedAt: now,
       expiresAt
@@ -107,14 +157,25 @@ export async function getConversationState(userId: string): Promise<Conversation
       accountNumber: state.accountNumber || undefined,
       password: decryptedPassword,
       server: state.server || undefined,
-      // Promo Creation Data
+      // Old Promo Creation Data
       code: state.promoCode || undefined,
       name: state.promoName || undefined,
       planType: state.promoPlanType || undefined,
       durationDays: state.promoDurationDays || undefined,
       isFree: state.promoIsFree ?? undefined,
       amountKobo: state.promoAmountKobo ?? undefined,
-      hasCopierAccess: state.promoHasCopier ?? undefined
+      hasCopierAccess: state.promoHasCopier ?? undefined,
+      // New Promo Creation Data
+      promoPlanType: (state as any).newPromoPlanType || undefined,
+      promoDurationDays: (state as any).newPromoDurationDays || undefined,
+      promoIsFree: (state as any).newPromoIsFree ?? undefined,
+      promoHasCopierAccess: (state as any).newPromoHasCopier ?? undefined,
+      promoDisplayName: (state as any).newPromoDisplayName || undefined,
+      promoExpiresAt: (state as any).newPromoExpiresAt || undefined,
+      promoUsageLimit: (state as any).newPromoUsageLimit ?? undefined,
+      promoAwaitingCustomInput: (state as any).newPromoAwaitingCustomInput ?? undefined,
+      promoCustomInputType: (state as any).newPromoCustomInputType || undefined,
+      promoCode: (state as any).newPromoCode || undefined
     }
   }
 }
@@ -164,6 +225,18 @@ export async function updateConversationData(userId: string, data: Partial<Conve
   if (data.isFree !== undefined) updateData.promoIsFree = data.isFree
   if (data.amountKobo !== undefined) updateData.promoAmountKobo = data.amountKobo
   if (data.hasCopierAccess !== undefined) updateData.promoHasCopier = data.hasCopierAccess
+
+  // New Promo Creation Data
+  if (data.promoPlanType !== undefined) updateData.newPromoPlanType = data.promoPlanType
+  if (data.promoDurationDays !== undefined) updateData.newPromoDurationDays = data.promoDurationDays
+  if (data.promoIsFree !== undefined) updateData.newPromoIsFree = data.promoIsFree
+  if (data.promoHasCopierAccess !== undefined) updateData.newPromoHasCopier = data.promoHasCopierAccess
+  if (data.promoDisplayName !== undefined) updateData.newPromoDisplayName = data.promoDisplayName
+  if (data.promoExpiresAt !== undefined) updateData.newPromoExpiresAt = data.promoExpiresAt
+  if (data.promoUsageLimit !== undefined) updateData.newPromoUsageLimit = data.promoUsageLimit
+  if (data.promoAwaitingCustomInput !== undefined) updateData.newPromoAwaitingCustomInput = data.promoAwaitingCustomInput
+  if (data.promoCustomInputType !== undefined) updateData.newPromoCustomInputType = data.promoCustomInputType
+  if (data.promoCode !== undefined) updateData.newPromoCode = data.promoCode
 
   await prisma.conversationState.update({
     where: { telegramUserId: userId },
