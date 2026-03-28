@@ -387,7 +387,7 @@ ${statsSection}
 ├─ More time to practice & profit
 └─ <b>Great value!</b>
 
-📅 <b>Monthly VIP</b> - ${trialEligible ? '₦9,000' : '₦18,000'} ${trialEligible ? '<s>(was ₦18,000)</s>' : ''}
+📅 <b>Monthly VIP</b> - ${trialEligible ? '₦17,500' : '₦35,000'} ${trialEligible ? '<s>(was ₦35,000)</s>' : ''}
 ├─ <b>30 days</b> access to VIP signals
 ├─ <b>Best value - serious traders!</b>
 ├─ Maximum time to profit
