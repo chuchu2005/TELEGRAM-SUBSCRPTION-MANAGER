@@ -453,9 +453,9 @@ Free trials are only available for new users.
 
 To get VIP signals, upgrade to a paid plan:
 
-💎 Basic: ₦5,000 (7 days)
-📊 Bi-Weekly: ₦9,000 (14 days)
-📅 Monthly: ₦18,000 (30 days)
+💎 Basic: ₦10,000 (7 days)
+📊 Bi-Weekly: ₦17,000 (14 days)
+📅 Monthly: ₦35,000 (30 days)
 
 Tap below to get started!`
 
@@ -547,9 +547,9 @@ async function handleHelp(user: TelegramUser): Promise<void> {
 Send the command: /pay
 
 <b>Step 2: Choose Your Plan</b>
-💎 Basic (₦5,000) - 7 days
-📊 Bi-Weekly (₦9,000) - 14 days (Best value!)
-📅 Monthly (₦18,000) - 30 days (Maximum savings!)
+💎 Basic (₦10,000) - 7 days
+📊 Bi-Weekly (₦17,000) - 14 days (Best value!)
+📅 Monthly (₦35,000) - 30 days (Maximum savings!)
 🎁 Promo (₦3,000) - 7 days (Limited time!)
 
 ━━━━━━━━━━━━━━━━━━━
@@ -652,7 +652,7 @@ async function handleQuickPay(user: TelegramUser, planType: 'basic' | 'biweekly'
   pendingEmailUsers.add(telegramUserId)
 
   const planNames = {
-    basic: 'Basic Plan (₦5,000)',
+    basic: 'Basic Plan (₦10,000)',
     biweekly: 'Bi-Weekly VIP (₦9,000)',
     monthly: 'Monthly VIP (₦18,000)'
   }
@@ -962,19 +962,19 @@ Still have questions? Send /help`
         reply_markup: {
           inline_keyboard: [
             [
-              { text: `💎 Pay ₦5,000 - Basic`, url: basicData.authorizationUrl }
+              { text: `💎 Pay ₦10,000 - Basic`, url: basicData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Basic Payment', callback_data: 'verify_basic' }
             ],
             [
-              { text: `📊 Pay ₦9,000 - Bi-Weekly`, url: biweeklyData.authorizationUrl }
+              { text: `📊 Pay ₦17,000 - Bi-Weekly`, url: biweeklyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Bi-Weekly Payment', callback_data: 'verify_biweekly' }
             ],
             [
-              { text: `📅 Pay ₦18,000 - Monthly`, url: monthlyData.authorizationUrl }
+              { text: `📅 Pay ₦35,000 - Monthly`, url: monthlyData.authorizationUrl }
             ],
             [
               { text: '✅ Verify Monthly Payment', callback_data: 'verify_monthly' }
@@ -2512,7 +2512,7 @@ The MT5 Auto Copier is only available for active Bi-Weekly/Monthly subscribers.
 ━━━━━━━━━━━━━━━━━━━
 
 <b>Want to renew?</b>
-Type /pay to see our Bi-Weekly (₦9,000) or Monthly (₦18,000) plans
+Type /pay to see our Bi-Weekly (₦17,000) or Monthly (₦35,000) plans
 
 Your subscription will be extended from today!`)
     } else {
@@ -2527,7 +2527,7 @@ The MT5 Auto Copier is only available for Bi-Weekly/Monthly subscribers.
 ━━━━━━━━━━━━━━━━━━━
 
 <b>Want to upgrade?</b>
-Type /pay to see our Bi-Weekly (₦9,000) or Monthly (₦18,000) plans`)
+Type /pay to see our Bi-Weekly (₦17,000) or Monthly (₦35,000) plans`)
     }
     return
   }
@@ -3041,9 +3041,9 @@ Send /cancel to exit`)
 Enter the discounted price in kobo:
 
 <i>Current prices:</i>
-• Basic: ₦5,000 (500,000 kobo)
-• Bi-Weekly: ₦9,000 (900,000 kobo)
-• Monthly: ₦18,000 (1,800,000 kobo)
+• Basic: ₦10,000 (1,000,000 kobo)
+• Bi-Weekly: ₦17,000 (1,700,000 kobo)
+• Monthly: ₦35,000 (3,500,000 kobo)
 
 <i>Enter the amount in kobo (e.g., 300000 for ₦3,000)</i>
 
@@ -4878,9 +4878,9 @@ export async function POST(request: NextRequest) {
 
         // Send photo with instructions
         const planNames = {
-          basic: 'Basic (₦5,000)',
-          biweekly: 'Bi-Weekly (₦9,000)',
-          monthly: 'Monthly (₦18,000)',
+          basic: 'Basic (₦10,000)',
+          biweekly: 'Bi-Weekly (₦17,000)',
+          monthly: 'Monthly (₦35,000)',
           promo: 'Promo (₦3,000)'
         }
         const planName = planNames[planType]
@@ -5356,7 +5356,7 @@ Please enter a valid email address.
         if (!args[0]) {
           pendingVerificationUsers.set(userId, 'basic')
 
-          const caption = `✅ <b>Verifying Basic (₦5,000) Payment</b>
+          const caption = `✅ <b>Verifying Basic (₦10,000) Payment</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -5392,7 +5392,7 @@ Or send /cancel to exit.`
         if (!args[0]) {
           pendingVerificationUsers.set(userId, 'biweekly')
 
-          const caption = `✅ <b>Verifying Bi-Weekly (₦9,000) Payment</b>
+          const caption = `✅ <b>Verifying Bi-Weekly (₦17,000) Payment</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -5428,7 +5428,7 @@ Or send /cancel to exit.`
         if (!args[0]) {
           pendingVerificationUsers.set(userId, 'monthly')
 
-          const caption = `✅ <b>Verifying Monthly (₦18,000) Payment</b>
+          const caption = `✅ <b>Verifying Monthly (₦35,000) Payment</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
