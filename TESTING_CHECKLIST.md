@@ -14,7 +14,7 @@ Use this checklist to test the complete webhook-free flow.
 ### Test 1: /start Command
 **Expected Result:**
 ```
-👋 Welcome to Premium VIP Community Access Bot!
+Welcome to Monthly VIP Community Access Bot!
 
 Choose a plan to get instant access to our VIP community:
 
@@ -23,7 +23,7 @@ Choose a plan to get instant access to our VIP community:
 ├─ VIP group only
 └─ _Perfect for trying out_
 
-👑 Premium Plan - ₦22,000
+👑 Monthly Plan - ₦35,000
 ├─ 14 days access
 ├─ VIP group + Auto Copier Bot
 └─ _Best value for serious traders_
@@ -116,7 +116,7 @@ _Type your email again or send /cancel to exit_
 ├─ 7 days VIP access
 └─ _For trying out_
 
-👑 Premium Plan - ₦22,000
+👑 Monthly Plan - ₦35,000
 ├─ 14 days VIP + Copier Bot
 └─ _Best value_
 
