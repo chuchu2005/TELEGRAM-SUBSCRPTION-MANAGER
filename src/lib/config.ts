@@ -15,7 +15,7 @@ export const PLANS = {
   },
   monthly: {
     name: 'Monthly VIP',
-    amountKobo: 1800000,  // NGN 18,000
+    amountKobo: 3500000,  // NGN 35,000
     durationDays: 30,
     hasCopierAccess: false  // Disabled for now, keep for future
   },
