@@ -381,7 +381,7 @@ ${statsSection}
 ├─ You copy trades yourself & LEARN trading
 └─ <b>Best way to start!</b>
 
-📊 <b>Bi-Weekly VIP</b> - ${trialEligible ? '₦4,500' : '₦9,000'} ${trialEligible ? '<s>(was ₦9,000)</s>' : ''}
+📊 <b>Bi-Weekly VIP</b> - ${trialEligible ? '₦8,500' : '₦17,000'} ${trialEligible ? '<s>(was ₦17,000)</s>' : ''}
 ├─ <b>14 days</b> access to VIP signals
 ├─ <b>Better value than Basic!</b>
 ├─ More time to practice & profit
