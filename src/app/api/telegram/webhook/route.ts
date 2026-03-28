@@ -375,7 +375,7 @@ ${statsSection}
 
 ━━━━━━━━━━━━━━━━━━━
 
-💎 <b>Basic Plan</b> - ₦5,000
+💎 <b>Basic Plan</b> - ₦10,000
 ├─ <b>7 days</b> access to VIP signals
 ├─ <b>🎓 PERFECT FOR BEGINNERS!</b>
 ├─ You copy trades yourself & LEARN trading
