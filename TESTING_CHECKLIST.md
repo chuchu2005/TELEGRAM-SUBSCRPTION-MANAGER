@@ -18,7 +18,7 @@ Use this checklist to test the complete webhook-free flow.
 
 Choose a plan to get instant access to our VIP community:
 
-💎 Basic Plan - ₦5,000
+💎 Basic Plan - ₦10,000
 ├─ 7 days access
 ├─ VIP group only
 └─ _Perfect for trying out_
@@ -112,7 +112,7 @@ _Type your email again or send /cancel to exit_
 
 💳 Step 2: Choose Your Plan
 
-💎 Basic Plan - ₦5,000
+💎 Basic Plan - ₦10,000
 ├─ 7 days VIP access
 └─ _For trying out_
 
@@ -159,7 +159,7 @@ _Still have questions? Send /help_
 - [ ] Payment page opens
 - [ ] Bank transfer is the only option
 - [ ] Email is pre-filled
-- [ ] Amount is ₦5,000
+- \[ \] Amount is ₦10,000
 
 ---
 
