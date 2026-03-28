@@ -9,7 +9,7 @@ export const PLANS = {
   },
   biweekly: {
     name: 'Bi-Weekly VIP',
-    amountKobo: 900000,  // NGN 9,000
+    amountKobo: 1700000,  // NGN 17,000
     durationDays: 14,
     hasCopierAccess: false  // Disabled for now, keep for future
   },
