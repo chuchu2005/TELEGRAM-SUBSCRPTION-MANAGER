@@ -3,7 +3,7 @@
 export const PLANS = {
   basic: {
     name: 'Basic VIP',
-    amountKobo: 500000,  // NGN 5,000
+    amountKobo: 1000000,  // NGN 10,000
     durationDays: 7,
     hasCopierAccess: false
   },
