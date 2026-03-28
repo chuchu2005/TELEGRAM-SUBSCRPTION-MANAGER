@@ -422,13 +422,13 @@ ${statsSection}
         { text: '🎁 Join for FREE for 24 hrs', callback_data: 'start_trial' }
       ],
       [
-        { text: '💎 Basic Plan - ₦5,000', callback_data: 'pay_basic' }
+        { text: '💎 Basic Plan - ₦10,000', callback_data: 'pay_basic' }
       ],
       [
-        { text: '📊 Bi-Weekly VIP - ₦9,000', callback_data: 'pay_biweekly' }
+        { text: '📊 Bi-Weekly VIP - ₦17,000', callback_data: 'pay_biweekly' }
       ],
       [
-        { text: '📅 Monthly VIP - ₦18,000', callback_data: 'pay_monthly' }
+        { text: '📅 Monthly VIP - ₦35,000', callback_data: 'pay_monthly' }
       ]
     ]
   })
