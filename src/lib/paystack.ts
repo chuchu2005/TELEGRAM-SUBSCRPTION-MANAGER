@@ -95,9 +95,9 @@ export function verifyWebhookSignature(rawBody: string, signature: string): bool
 /**
  * Validate payment against expected amount
  * Note: Paystack adds fees, so actual amount may be slightly higher than expected
- * - ₦10,000 Basic plan: ~₦200-300 fees
- * - ₦17,000 Bi-Weekly plan: ~₦400-500 fees
- * - ₦35,000 Monthly plan: ~₦800-900 fees
+ * - ₦5,000 Basic plan: ~₦100-200 fees
+ * - ₦9,000 Bi-Weekly plan: ~₦200-300 fees
+ * - ₦18,000 Monthly plan: ~₦400-500 fees
  * - ₦22,000 Premium plan: ~₦1,000 fees
  */
 export function validatePaymentAmount(

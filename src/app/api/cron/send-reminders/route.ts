@@ -49,9 +49,9 @@ Because you tried us out, we're giving you <b>50% OFF</b> to upgrade today.
 
 This discount disappears in <b>24 hours</b> after your trial ends. After that, prices go back to normal — no exceptions.
 
-💎 Basic → <b>₦5,000</b> <s>(usually ₦10,000)</s> — 7 days
-📊 Bi-Weekly → <b>₦8,500</b> <s>(usually ₦17,000)</s> — 14 days
-📅 Monthly → <b>₦17,500</b> <s>(usually ₦35,000)</s> — 30 days
+💎 Basic → <b>₦2,500</b> <s>(usually ₦5,000)</s> — 7 days
+📊 Bi-Weekly → <b>₦4,500</b> <s>(usually ₦9,000)</s> — 14 days
+📅 Monthly → <b>₦9,000</b> <s>(usually ₦18,000)</s> — 30 days
 👑 Premium → <b>₦11,000</b> <s>(usually ₦22,000)</s> — 14 days + Auto Copier
 
 ━━━━━━━━━━━━━━━━━━━

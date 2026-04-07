@@ -255,7 +255,7 @@ function PaymentSuccessContent() {
             </li>
             <li className="flex items-start">
               <span className="bg-blue-600 text-white rounded-full h-5 w-5 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-xs font-bold">5</span>
-              <span>Or if you paid ₦35,000: <code className="bg-gray-200 px-2 py-0.5 rounded text-xs">/verify_monthly YOUR_REFERENCE</code></span>
+              <span>Or if you paid ₦18,000: <code className="bg-gray-200 px-2 py-0.5 rounded text-xs">/verify_monthly YOUR_REFERENCE</code></span>
             </li>
             <li className="flex items-start">
               <span className="bg-blue-600 text-white rounded-full h-5 w-5 flex items-center justify-center mr-2 mt-0.5 flex-shrink-0 text-xs font-bold">6</span>

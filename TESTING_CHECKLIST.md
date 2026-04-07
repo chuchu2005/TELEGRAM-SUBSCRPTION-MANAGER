@@ -18,12 +18,12 @@ Welcome to Monthly VIP Community Access Bot!
 
 Choose a plan to get instant access to our VIP community:
 
-💎 Basic Plan - ₦10,000
+💎 Basic Plan - ₦5,000
 ├─ 7 days access
 ├─ VIP group only
 └─ _Perfect for trying out_
 
-👑 Monthly Plan - ₦35,000
+👑 Monthly Plan - ₦18,000
 ├─ 14 days access
 ├─ VIP group + Auto Copier Bot
 └─ _Best value for serious traders_
@@ -112,11 +112,11 @@ _Type your email again or send /cancel to exit_
 
 💳 Step 2: Choose Your Plan
 
-💎 Basic Plan - ₦10,000
+💎 Basic Plan - ₦5,000
 ├─ 7 days VIP access
 └─ _For trying out_
 
-👑 Monthly Plan - ₦35,000
+👑 Monthly Plan - ₦18,000
 ├─ 14 days VIP + Copier Bot
 └─ _Best value_
 
@@ -159,7 +159,7 @@ _Still have questions? Send /help_
 - [ ] Payment page opens
 - [ ] Bank transfer is the only option
 - [ ] Email is pre-filled
-- \[ \] Amount is ₦10,000
+- \[ \] Amount is ₦5,000
 
 ---
 
