@@ -160,10 +160,10 @@ User has been removed from channel and MetaCopier.`)
           let expiryMessage = ''
 
           if (subscription.planType === 'trial') {
-            // Calculate 50% discount prices dynamically
-            const discountBasic = Math.round(PLANS.basic.amountKobo * 0.5 / 100)
-            const discountBiweekly = Math.round(PLANS.biweekly.amountKobo * 0.5 / 100)
-            const discountMonthly = Math.round(PLANS.monthly.amountKobo * 0.5 / 100)
+            // Calculate 15% discount prices dynamically
+            const discountBasic = Math.round(PLANS.basic.amountKobo * 0.85 / 100)
+            const discountBiweekly = Math.round(PLANS.biweekly.amountKobo * 0.85 / 100)
+            const discountMonthly = Math.round(PLANS.monthly.amountKobo * 0.85 / 100)
 
             expiryMessage = `⏰ <b>Your Free Trial Has Ended!</b>
 
@@ -190,8 +190,8 @@ Don't lose momentum - get back in the game!
 
 ━━━━━━━━━━━━━━━━━━━
 
-🎁 <b>SPECIAL OFFER - 50% OFF!</b>
-Because you just completed your trial, we're giving you a 50% discount on ALL plans!
+🎁 <b>SPECIAL OFFER - 15% OFF!</b>
+Because you just completed your trial, we're giving you a 15% discount on ALL plans!
 <i>(Valid for the next 24 hours only)</i>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -232,7 +232,7 @@ Or type /pay to get started.`
               expiryMessage,
               {
                 inline_keyboard: [[
-                  { text: '💳 Upgrade Now (50% OFF)', callback_data: 'pay' }
+                  { text: '💳 Upgrade Now (15% OFF)', callback_data: 'pay' }
                 ]]
               }
             )

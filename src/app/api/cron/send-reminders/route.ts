@@ -33,6 +33,11 @@ export async function GET(request: NextRequest) {
       try {
         const hoursLeft = Math.ceil((subscription.expiresAt.getTime() - now.getTime()) / (60 * 60 * 1000))
 
+        // Calculate 15% discount prices
+        const discountBasic = Math.round(PLANS.basic.amountKobo * 0.85 / 100)
+        const discountBiweekly = Math.round(PLANS.biweekly.amountKobo * 0.85 / 100)
+        const discountMonthly = Math.round(PLANS.monthly.amountKobo * 0.85 / 100)
+
         const message = `⏰ <b>Your free trial ends in ~${hoursLeft} hours!</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -45,14 +50,13 @@ Those signals stop when your trial ends.
 
 🔥 <b>HERE IS YOUR EXCLUSIVE OFFER:</b>
 
-Because you tried us out, we're giving you <b>50% OFF</b> to upgrade today.
+Because you tried us out, we're giving you <b>15% OFF</b> to upgrade today.
 
 This discount disappears in <b>24 hours</b> after your trial ends. After that, prices go back to normal — no exceptions.
 
-💎 Basic → <b>₦2,500</b> <s>(usually ₦5,000)</s> — 7 days
-📊 Bi-Weekly → <b>₦4,500</b> <s>(usually ₦9,000)</s> — 14 days
-📅 Monthly → <b>₦9,000</b> <s>(usually ₦18,000)</s> — 30 days
-👑 Premium → <b>₦11,000</b> <s>(usually ₦22,000)</s> — 14 days + Auto Copier
+💎 Basic → <b>₦${discountBasic.toLocaleString()}</b> <s>(usually ₦${(PLANS.basic.amountKobo / 100).toLocaleString()})</s> — 7 days
+📊 Bi-Weekly → <b>₦${discountBiweekly.toLocaleString()}</b> <s>(usually ₦${(PLANS.biweekly.amountKobo / 100).toLocaleString()})</s> — 14 days
+📅 Monthly → <b>₦${discountMonthly.toLocaleString()}</b> <s>(usually ₦${(PLANS.monthly.amountKobo / 100).toLocaleString()})</s> — 30 days
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -63,7 +67,7 @@ Tap below to lock in your discount before it's gone.`
         await sendMessageWithKeyboard(subscription.telegramUserId, message, {
           inline_keyboard: [
             [
-              { text: '🔥 Upgrade Now — 50% OFF (24hrs only)', callback_data: 'pay' }
+              { text: '🔥 Upgrade Now — 15% OFF (24hrs only)', callback_data: 'pay' }
             ]
           ]
         })
