@@ -1854,26 +1854,33 @@ Please contact admin.`)
     return
   }
 
-  // 5. Check if user has active subscription
-  const activeSub = await prisma.subscription.findFirst({
+  // 5. Check if user has already used this specific promo code
+  const existingRedemption = await prisma.subscription.count({
     where: {
       telegramUserId: userId,
-      expiresAt: { gte: new Date() }
+      paystackRef: { equals: `PROMO_${code.toUpperCase()}_`, mode: 'insensitive' }
     }
   })
 
-  if (activeSub) {
-    await sendMessage(user.id, `⚠️ <b>Active Subscription Found</b>
+  if (existingRedemption >= promo.perUserLimit) {
+    await sendMessage(user.id, `⚠️ <b>Already Redeemed!</b>
 
-You already have an active ${PLANS[activeSub.planType as PlanType].name} plan!
-
-Your access expires on ${activeSub.expiresAt.toLocaleDateString()}.
-
-Please wait for it to expire before using a promo code.`)
+You've already used this promo code. You can only use it ${promo.perUserLimit} time(s).`)
     return
   }
 
-  // 6. For PAID promos, generate payment link instead of instant subscription
+  // 6. Check for active subscription to calculate stacked expiry
+  const lastActiveSub = await prisma.subscription.findFirst({
+    where: {
+      telegramUserId: userId,
+      isRemoved: false,
+      expiresAt: { gt: new Date() }
+    },
+    orderBy: { expiresAt: 'desc' }
+  })
+  const currentExpiry = lastActiveSub?.expiresAt
+
+  // 7. For PAID promos, generate payment link instead of instant subscription
   if (!promo.isFree && promo.amountKobo) {
     // Generate payment link for discounted price
     const planType = promo.planType as PlanType
@@ -1945,11 +1952,9 @@ Failed to generate payment link. Please try again or contact admin.`)
   }
 
   // 7. Create the subscription (for FREE promos)
-  const startDate = new Date()
-  const expiresAt = new Date(startDate)
-  expiresAt.setDate(expiresAt.getDate() + promo.durationDays)
+  const expiresAt = calculateExpiryDate(promo.planType as PlanType, currentExpiry)
 
-  await prisma.subscription.create({
+  const newSubscription = await prisma.subscription.create({
     data: {
       telegramUserId: userId,
       telegramUsername: user.username || null,
@@ -1957,22 +1962,70 @@ Failed to generate payment link. Please try again or contact admin.`)
       paystackRef: `PROMO_${code.toUpperCase()}_${Date.now()}`,
       amountKobo: promo.isFree ? 0 : (promo.amountKobo || 0),
       planType: promo.planType as PlanType,
+      startedAt: new Date(),
       expiresAt: expiresAt,
       hasCopierAccess: promo.hasCopierAccess
     }
   })
 
-  // 8. Increment promo usage count
+  // 8. Migrate MT5 setup from old active sub if renewing a copier plan
+  if (promo.hasCopierAccess && lastActiveSub) {
+    const activeMt5 = await prisma.mt5Setup.findFirst({
+      where: { subscription: { telegramUserId: userId, isRemoved: false, id: { not: newSubscription.id } } },
+      orderBy: { createdAt: 'desc' }
+    })
+    if (activeMt5) {
+      await prisma.mt5Setup.update({ where: { id: activeMt5.id }, data: { subscriptionId: newSubscription.id } })
+      console.log(`Migrated MT5 setup ${activeMt5.id} to promo subscription ${newSubscription.id}`)
+    }
+  }
+
+  // 9. Increment promo usage count
   await prisma.promoCode.update({
     where: { id: promo.id },
     data: { usageCount: { increment: 1 } }
   })
 
-  // 9. Generate invite link
+  // 9. Unban user before creating invite link (in case they were previously banned)
+  await unbanChatMember(userId)
+  console.log(`[redeemPromoCode] Unbanned user ${userId} before creating invite link`)
+
+  // 10. Generate invite link
   const inviteLink = await createInviteLink()
 
-  // 10. Send success message and invite link
-  await sendMessage(user.id, `✅ <b>Promo Code Redeemed Successfully!</b>
+  // 11. Send success message and invite link
+  if (lastActiveSub) {
+    // User is extending their subscription
+    await sendMessage(user.id, `✅ <b>Subscription Extended!</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+🎁 <b>${promo.name || code.toUpperCase()}</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+✅ <b>Your ${PLANS[promo.planType as PlanType].name} has been extended!</b>
+
+📅 <b>New Expiry:</b> ${expiresAt.toLocaleDateString()}
+
+━━━━━━━━━━━━━━━━━━━
+
+🔗 <b>Join Channel:</b>
+${inviteLink}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>⚠️ Important:</b>
+• This link expires in 24 hours
+• Join the VIP channel to continue receiving signals
+• Your access will automatically expire on ${expiresAt.toLocaleDateString()}
+
+━━━━━━━━━━━━━━━━━━━
+
+Enjoy! 🎉`)
+  } else {
+    // New subscription
+    await sendMessage(user.id, `✅ <b>Promo Code Redeemed Successfully!</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -2000,6 +2053,7 @@ ${inviteLink}
 ━━━━━━━━━━━━━━━━━━━
 
 Enjoy! 🎉`)
+  }
 }
 
 /**
@@ -2177,15 +2231,15 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
         })
 
         // Unban user before creating invite link (in case they were previously banned)
-        if (!lastActiveSub) {
-          const unbanResult = await unbanChatMember(userId)
-          console.log(`[handleVerify - Promo] Unbanned user ${userId} before creating invite link. Result: ${unbanResult}`)
-        }
+        // Always unban to ensure user can join even if they left or were banned
+        const unbanResult = await unbanChatMember(userId)
+        console.log(`[handleVerify - Promo] Unbanned user ${userId} before creating invite link. Result: ${unbanResult}`)
 
-        let inviteLink = lastActiveSub?.inviteLinkUsed || await createInviteLink() || ''
+        // Always generate fresh invite link to avoid expired links
+        const inviteLink = await createInviteLink() || ''
 
         if (lastActiveSub) {
-          await sendMessage(user.id, `🎉 <b>Subscription Extended!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n✅ <b>${customPromo.name || customPromo.code} Promo Applied!</b>\n\n📅 <b>New Expiry:</b> ${expiresAt.toLocaleDateString()}\n\n━━━━━━━━━━━━━━━━━━━\n\nYour access has been extended. You are already in the VIP channel!`)
+          await sendMessage(user.id, `🎉 <b>Subscription Extended!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n✅ <b>${customPromo.name || customPromo.code} Promo Applied!</b>\n\n📅 <b>New Expiry:</b> ${expiresAt.toLocaleDateString()}\n\n━━━━━━━━━━━━━━━━━━━\n\n🔗 <b>Join Channel:</b>\n${inviteLink}`)
         } else {
           await sendMessage(user.id, `🎉 <b>Promo Activated!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n✅ <b>${customPromo.name || customPromo.code} Promo - ${customPromo.durationDays} Days!</b>\n\n📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}\n\n━━━━━━━━━━━━━━━━━━━\n\n🔗 <b>Join Channel:</b>\n${inviteLink}`)
         }
@@ -2255,13 +2309,13 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
       }
 
       // Unban user before creating invite link (in case they were previously banned)
-      if (!lastActiveSub) {
-        const unbanResult = await unbanChatMember(userId)
-        console.log(`[handleVerify - Hardcoded Promo] Unbanned user ${userId} before creating invite link. Result: ${unbanResult}`)
-      }
+      // Always unban to ensure user can join even if they left or were banned
+      const unbanResult = await unbanChatMember(userId)
+      console.log(`[handleVerify - Hardcoded Promo] Unbanned user ${userId} before creating invite link. Result: ${unbanResult}`)
 
-      let inviteLink = lastActiveSub?.inviteLinkUsed || await createInviteLink() || ''
-      await sendMessage(user.id, `🎉 <b>${promoCode} Activated!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}\n\n━━━━━━━━━━━━━━━━━━━\n\n${lastActiveSub ? 'Your access has been extended!' : `🔗 <b>Join Channel:</b>\n${inviteLink}`}`)
+      // Always generate fresh invite link to avoid expired links
+      const inviteLink = await createInviteLink() || ''
+      await sendMessage(user.id, `🎉 <b>${promoCode} Activated!</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n📅 <b>Expires:</b> ${expiresAt.toLocaleDateString()}\n\n━━━━━━━━━━━━━━━━━━━\n\n🔗 <b>Join Channel:</b>\n${inviteLink}`)
       return
     }
 
