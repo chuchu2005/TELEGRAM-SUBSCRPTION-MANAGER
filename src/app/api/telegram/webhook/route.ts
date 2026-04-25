@@ -1858,7 +1858,7 @@ Please contact admin.`)
   const existingRedemption = await prisma.subscription.count({
     where: {
       telegramUserId: userId,
-      paystackRef: { equals: `PROMO_${code.toUpperCase()}_`, mode: 'insensitive' }
+      paystackRef: { contains: `PROMO_${code.toUpperCase()}_`, mode: 'insensitive' }
     }
   })
 
