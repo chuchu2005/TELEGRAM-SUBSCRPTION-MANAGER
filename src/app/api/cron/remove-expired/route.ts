@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { banChatMember, sendMessage, sendMessageWithKeyboard } from '@/lib/telegram'
+import { banChatMember, sendMessage, sendMessageWithKeyboard, getChatMember } from '@/lib/telegram'
 import { removeUserMt5Account } from '@/lib/metacopier'
 import { ADMIN_ID, PLANS } from '@/lib/config'
+
+const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID!
 
 /**
  * GET handler for cron job to remove expired users
@@ -15,6 +17,8 @@ export async function GET(request: NextRequest) {
     // Find all expired subscriptions that haven't been removed yet
     const now = new Date()
     console.log(`[Remove Expired Cron] Current time: ${now.toISOString()}`)
+
+    // Step 1: Process expired subscriptions not marked as removed
     const query: any = {
       where: {
         expiresAt: { lt: now },
@@ -26,8 +30,23 @@ export async function GET(request: NextRequest) {
 
     console.log(`[Remove Expired Cron] Found ${expiredSubscriptions.length} expired subscriptions to process`)
 
+    // Step 2: Verify users marked as removed are actually gone
+    // Find subscriptions marked as removed within the last 7 days to verify
+    const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+    const verificationQuery: any = {
+      where: {
+        isRemoved: true,
+        removedAt: { gte: sevenDaysAgo }
+      }
+    }
+    const subscriptionsToVerify: any[] = await prisma.subscription.findMany(verificationQuery)
+
+    console.log(`[Remove Expired Cron] Found ${subscriptionsToVerify.length} subscriptions to verify`)
+
     let removedCount = 0
     let failedCount = 0
+    let verifiedCount = 0
+    let verificationFailedCount = 0
 
     for (const subscription of expiredSubscriptions) {
       console.log(`[Remove Expired Cron] Processing subscription ${subscription.id} for user ${subscription.telegramUserId}, plan: ${subscription.planType}, expired: ${subscription.expiresAt.toISOString()}`)
@@ -145,17 +164,15 @@ User has been removed from channel and MetaCopier.`)
         const banned = await banChatMember(subscription.telegramUserId)
         console.log(`[Remove Expired Cron] Ban result for user ${subscription.telegramUserId}: ${banned}`)
 
-        // Always mark subscription as removed - even if ban fails (user may not be in channel)
-        // Update subscription as removed
-        await prisma.subscription.update({
-          where: { id: subscription.id },
-          data: {
-            isRemoved: true,
-            removedAt: now
-          }
-        })
-
         if (banned) {
+          // Mark subscription as removed only if ban succeeded
+          await prisma.subscription.update({
+            where: { id: subscription.id },
+            data: {
+              isRemoved: true,
+              removedAt: now
+            }
+          })
           // Send notification to user (different message for trials vs paid plans)
           let expiryMessage = ''
 
@@ -251,25 +268,73 @@ Or type /pay to get started.`
           removedCount++
           console.log(`Removed user ${subscription.telegramUserId} (subscription ${subscription.id})`)
         } else {
-          // Ban failed (likely user not in channel), but we still marked subscription as removed
-          console.log(`[Remove Expired Cron] Ban failed for user ${subscription.telegramUserId} (user may not be in channel), but subscription marked as removed`)
+          // Ban failed - don't mark as removed so it will be retried on next run
           failedCount++
-          console.error(`Failed to ban user ${subscription.telegramUserId}`)
+          console.error(`Failed to ban user ${subscription.telegramUserId}, will retry on next run`)
         }
       } catch (error) {
         failedCount++
         console.error(`Error removing subscription ${subscription.id}:`, error)
-        // Update already happened before this, just mark as failed for tracking
+        // Subscription not marked as removed, will be retried on next run
       }
     }
 
-    console.log(`[Remove Expired Cron] Summary: Processed=${expiredSubscriptions.length}, Removed=${removedCount}, Failed=${failedCount}`)
+    console.log(`[Remove Expired Cron] Completed processing expired subscriptions. Now verifying removed users...`)
+
+    // Step 3: Verify users marked as removed are actually gone
+    for (const subscription of subscriptionsToVerify) {
+      const userId = subscription.telegramUserId
+
+      try {
+        const response = await getChatMember(userId, CHANNEL_ID)
+        const status = response.result?.status || 'error'
+        const isActuallyRemoved = !['member', 'administrator', 'creator'].includes(status)
+
+        if (isActuallyRemoved) {
+          verifiedCount++
+          console.log(`[Remove Expired Cron] Verified user ${userId} is actually removed (status: ${status})`)
+        } else {
+          // User is still in channel! Reset for retry
+          verificationFailedCount++
+          console.log(`[Remove Expired Cron] VERIFICATION FAILED: User ${userId} is still in channel (status: ${status}) - resetting for retry`)
+
+          await prisma.subscription.update({
+            where: { id: subscription.id },
+            data: {
+              isRemoved: false,
+              removedAt: null
+            }
+          })
+
+          // Try to ban now
+          const banned = await banChatMember(userId)
+          if (banned) {
+            await prisma.subscription.update({
+              where: { id: subscription.id },
+              data: {
+                isRemoved: true,
+                removedAt: now
+              }
+            })
+            console.log(`[Remove Expired Cron] Successfully removed ghost user ${userId} during verification`)
+          } else {
+            console.log(`[Remove Expired Cron] Ban failed for ghost user ${userId}, will retry next run`)
+          }
+        }
+      } catch (error) {
+        console.error(`Error verifying user ${userId}:`, error)
+      }
+    }
+
+    console.log(`[Remove Expired Cron] Summary: Processed=${expiredSubscriptions.length}, Removed=${removedCount}, Failed=${failedCount}, Verified=${verifiedCount}, VerificationFailed=${verificationFailedCount}`)
 
     return NextResponse.json({
       success: true,
       processed: expiredSubscriptions.length,
       removed: removedCount,
       failed: failedCount,
+      verified: verifiedCount,
+      verificationFailed: verificationFailedCount,
       timestamp: now.toISOString()
     })
   } catch (error) {
