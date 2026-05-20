@@ -85,7 +85,7 @@ export function calculateExpiryDate(planType: PlanType, baseDate?: Date): Date {
 }
 
 // Broadcast Message Configuration
-// Can be overridden by environment variables: BROADCAST_8AM_TEXT, BROADCAST_10AM_TEXT, BROADCAST_BUTTON_TEXT
+// Can be overridden by environment variables: BROADCAST_8AM_TEXT, BROADCAST_10AM_TEXT, BROADCAST_8PM_TEMPLATE, BROADCAST_BUTTON_TEXT
 export const BROADCAST_MESSAGES = {
   '8': {
     text: process.env.BROADCAST_8AM_TEXT || "1st XAUUSD Trade of the day just dropped in the VIP Group Now, Join now to take the trade",
@@ -94,6 +94,16 @@ export const BROADCAST_MESSAGES = {
   '10': {
     text: process.env.BROADCAST_10AM_TEXT || "Tp4 just hit on the xauusd trade dropped in the vip",
     buttonText: process.env.BROADCAST_BUTTON_TEXT || "Join Now"
+  },
+  '20': {
+    template: process.env.BROADCAST_8PM_TEMPLATE || "📊 <b>Today's Trades In The VIP Group Summary</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n<b>📈 Total Trades Today:</b> {trades}\n<b>💱 Pair:</b> XAUUSD\n<b>💰 Total Pips Profit:</b> {pips} pips\n\n━━━━━━━━━━━━━━━━━━━\n\n<b>Don't miss tomorrow's signals!</b>\nJoin VIP group now to catch the next winning trades.",
+    buttonText: process.env.BROADCAST_BUTTON_TEXT || "Join Now",
+    tradeRanges: {
+      minTrades: 1,
+      maxTrades: 2,
+      minPips: 1000,
+      maxPips: 2000
+    }
   }
 } as const
 

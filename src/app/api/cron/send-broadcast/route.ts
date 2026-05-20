@@ -5,9 +5,22 @@ import { BROADCAST_MESSAGES, calculateExpiryDate, PLANS, ADMIN_ID } from '@/lib/
 import { createHash } from 'crypto'
 
 /**
+ * Generate randomized trade summary message
+ * Replaces {trades} and {pips} placeholders with random values
+ */
+function generateTradeSummary(template: string, minTrades: number, maxTrades: number, minPips: number, maxPips: number): { message: string, trades: number, pips: number } {
+  const trades = Math.floor(Math.random() * (maxTrades - minTrades + 1)) + minTrades
+  const pips = Math.floor(Math.random() * (maxPips - minPips + 1)) + minPips
+  const message = template
+    .replace('{trades}', trades.toString())
+    .replace('{pips}', pips.toString())
+  return { message, trades, pips }
+}
+
+/**
  * GET handler for broadcast cron job
- * Sends broadcast messages to all users based on time (8am or 10am Nigerian)
- * Query parameter: ?hour=8 or ?hour=10
+ * Sends broadcast messages to all users based on time (8am, 10am, or 8pm Nigerian)
+ * Query parameter: ?hour=8, ?hour=10, or ?hour=20
  */
 
 export async function GET(request: NextRequest) {
@@ -17,18 +30,39 @@ export async function GET(request: NextRequest) {
     const hourParam = searchParams.get('hour') || '8' // Default to 8am if no hour provided
 
     // Validate hour parameter
-    const validHours = ['8', '10'] as const
+    const validHours = ['8', '10', '20'] as const
     if (!validHours.includes(hourParam as any)) {
       return NextResponse.json({
         error: 'Invalid hour parameter',
-        message: 'Hour must be 8 or 10'
+        message: 'Hour must be 8, 10, or 20'
       }, { status: 400 })
     }
 
-    const hour = hourParam as '8' | '10'
+    const hour = hourParam as '8' | '10' | '20'
     const message = BROADCAST_MESSAGES[hour]
 
-    console.log(`[Broadcast Cron] Starting ${hour}am broadcast at ${now.toISOString()}`)
+    // Generate dynamic message for 8pm broadcast (hour='20')
+    let messageText = ''
+    let tradeStats = null
+    if (hour === '20' && 'template' in message) {
+      const ranges = message.tradeRanges
+      tradeStats = generateTradeSummary(
+        message.template,
+        ranges.minTrades,
+        ranges.maxTrades,
+        ranges.minPips,
+        ranges.maxPips
+      )
+      messageText = tradeStats.message
+      console.log(`[Broadcast Cron] Generated trade summary: ${tradeStats.trades} trade(s), ${tradeStats.pips} pips`)
+    } else if ('text' in message) {
+      messageText = message.text
+    } else {
+      messageText = message.template || ''
+    }
+
+    const timeLabel = hour === '20' ? '8 PM' : `${hour} AM`
+    console.log(`[Broadcast Cron] Starting ${timeLabel} broadcast at ${now.toISOString()}`)
 
     // Get all users from User table (no time filter - send to all users including inactive ones)
     const uniqueUsers = await prisma.user.findMany({
@@ -69,7 +103,7 @@ export async function GET(request: NextRequest) {
         })
 
         if (recentBroadcast) {
-          console.log(`[Broadcast Cron] Skipping user ${userId} - sent ${hour}am broadcast within last 24 hours`)
+          console.log(`[Broadcast Cron] Skipping user ${userId} - sent ${timeLabel} broadcast within last 24 hours`)
           skippedCount++
           continue
         }
@@ -79,7 +113,7 @@ export async function GET(request: NextRequest) {
 
         await sendMessageWithKeyboard(
           userId,
-          message.text,
+          messageText,
           {
             inline_keyboard: [
               [
@@ -94,7 +128,7 @@ export async function GET(request: NextRequest) {
           data: {
             messageHash: createHash('md5').update(`${hour}_${userId}_${Date.now()}`).digest('hex'),
             telegramUserId: userId,
-            message: message.text,
+            message: messageText,
             messageHour: hour,
             action: 'broadcast_sent'
           }
@@ -115,11 +149,11 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    console.log(`[Broadcast Cron] Completed ${hour}am broadcast. Processed=${processedCount}, Sent=${sentCount}, Failed=${failedCount}, Skipped=${skippedCount}`)
+    console.log(`[Broadcast Cron] Completed ${timeLabel} broadcast. Processed=${processedCount}, Sent=${sentCount}, Failed=${failedCount}, Skipped=${skippedCount}`)
 
     // Send summary to admin
     try {
-      const summaryMessage = `📊 <b>Broadcast Summary - ${hour} AM Nigerian Time</b>
+      const summaryMessage = `📊 <b>Broadcast Summary - ${timeLabel} Nigerian Time</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -127,6 +161,8 @@ export async function GET(request: NextRequest) {
 ❌ <b>Failed:</b> ${failedCount}
 ⏭️ <b>Skipped:</b> ${skippedCount}
 📝 <b>Total Processed:</b> ${processedCount}
+
+${tradeStats ? `\n━━━━━━━━━━━━━━━━━━━\n\n📈 <b>Trade Stats Used:</b>\n• Trades: ${tradeStats.trades}\n• Pips: ${tradeStats.pips}` : ''}
 
 ━━━━━━━━━━━━━━━━━━━
 
