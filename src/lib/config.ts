@@ -83,3 +83,18 @@ export function calculateExpiryDate(planType: PlanType, baseDate?: Date): Date {
   expiryDate.setDate(expiryDate.getDate() + plan.durationDays)
   return expiryDate
 }
+
+// Broadcast Message Configuration
+// Can be overridden by environment variables: BROADCAST_8AM_TEXT, BROADCAST_10AM_TEXT, BROADCAST_BUTTON_TEXT
+export const BROADCAST_MESSAGES = {
+  '8': {
+    text: process.env.BROADCAST_8AM_TEXT || "1st XAUUSD Trade of the day just dropped in the VIP Group Now, Join now to take the trade",
+    buttonText: process.env.BROADCAST_BUTTON_TEXT || "Join Now"
+  },
+  '10': {
+    text: process.env.BROADCAST_10AM_TEXT || "Tp4 just hit on the xauusd trade dropped in the vip",
+    buttonText: process.env.BROADCAST_BUTTON_TEXT || "Join Now"
+  }
+} as const
+
+export type BroadcastHour = keyof typeof BROADCAST_MESSAGES

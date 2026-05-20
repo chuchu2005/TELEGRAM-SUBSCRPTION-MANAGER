@@ -2461,6 +2461,116 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
 
 
 /**
+ * Handle broadcast trial button click
+ * Creates a trial subscription for new users who click "Join Now" from broadcast
+ */
+async function handleBroadcastTrial(user: TelegramUser, callbackId: string): Promise<void> {
+  const userId = user.id.toString()
+
+  // Check if user has ANY previous subscription history (trials or paid plans)
+  const previousSubs = await prisma.subscription.count({
+    where: {
+      telegramUserId: userId
+    }
+  })
+
+  if (previousSubs > 0) {
+    // User already has a subscription - show payment options
+    await handleBroadcastPay(user, callbackId)
+    return
+  }
+
+  // Create trial subscription
+  const expiresAt = new Date()
+  expiresAt.setHours(expiresAt.getHours() + 24) // 24 hours from now
+
+  // Always unban user before creating invite link (safety measure)
+  await unbanChatMember(user.id)
+  console.log(`Unbanned user ${user.id} before sending broadcast trial invite link`)
+
+  const inviteLink = await createInviteLink()
+
+  if (!inviteLink) {
+    await answerCallbackQuery(callbackId, '❌ Failed to create invite link')
+    await sendMessage(user.id, `Sorry, couldn't create invite link. Try again.`)
+    return
+  }
+
+  await prisma.subscription.create({
+    data: {
+      telegramUserId: userId,
+      telegramUsername: user.username || null,
+      telegramName: `${user.first_name || ''} ${user.last_name || ''}`.trim() || 'User',
+      paystackRef: `BROADCAST_TRIAL_${user.id}_${Date.now()}`,
+      amountKobo: 0,
+      planType: 'trial',
+      hasCopierAccess: false,
+      startedAt: new Date(),
+      expiresAt,
+      inviteLinkUsed: inviteLink
+    }
+  })
+
+  // Answer callback
+  await answerCallbackQuery(callbackId, '✅ Trial created! Check your messages')
+
+  // Send trial welcome message
+  await sendMessageWithKeyboard(
+    user.id,
+    `🎁 <b>Your 24-Hour Free Trial is Ready!</b>\n\n` +
+    `━━━━━━━━━━━━━━━━━━━\n\n` +
+    `You've been granted a 24-hour trial to our VIP signals group!\n\n` +
+    `<b>📋 What you'll get:</b>\n` +
+    `• Premium XAUUSD trading signals\n` +
+    `• Real-time trade entries & exits\n` +
+    `• Risk management guidance\n\n` +
+    `<b>🔗 Join the VIP Group:</b>\n` +
+    `${inviteLink}\n\n` +
+    `━━━━━━━━━━━━━━━━━━━\n\n` +
+    `<b>⏰ Trial expires in 24 hours</b>\n\n` +
+    `Upgrade now to continue receiving our signals!`,
+    {
+      inline_keyboard: [
+        [
+          { text: '💳 Upgrade Now', callback_data: 'broadcast_pay' }
+        ]
+      ]
+    }
+  )
+}
+
+/**
+ * Handle broadcast pay button click
+ * Shows payment options to users who click "Join Now" from broadcast
+ */
+async function handleBroadcastPay(user: TelegramUser, callbackId: string): Promise<void> {
+  const telegramUserId = user.id.toString()
+
+  // Mark user as waiting for email
+  pendingEmailUsers.add(telegramUserId)
+
+  // Answer callback
+  await answerCallbackQuery(callbackId, '✅ Please enter your email')
+
+  // Show payment options
+  await sendMessage(user.id, `📧 <b>Step 1: Enter Your Email</b>
+
+Please provide your email address to continue.
+
+<b>Why do we need this?</b>
+✅ To send your official payment receipt
+✅ To help if there are any issues
+✅ To notify you before expiration
+
+━━━━━━━━━━━━━━━━━━━
+
+<i>Just type your email (e.g., john@email.com)</i>
+
+<i>Or send /cancel to exit</i>`)
+}
+
+
+/**
  * Handle /status command
  */
 async function handleStatus(user: TelegramUser): Promise<void> {
@@ -5012,6 +5122,18 @@ Or send /cancel to exit.`
 
       if (data === 'help') {
         await handleHelp(from)
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle broadcast trial button click
+      if (data === 'broadcast_trial') {
+        await handleBroadcastTrial(from, id)
+        return NextResponse.json({ ok: true })
+      }
+
+      // Handle broadcast pay button click
+      if (data === 'broadcast_pay') {
+        await handleBroadcastPay(from, id)
         return NextResponse.json({ ok: true })
       }
 

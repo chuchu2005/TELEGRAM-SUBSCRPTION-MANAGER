@@ -197,7 +197,11 @@ model BroadcastLog {
   messageHash   String   // SHA-256 hash of message content
   telegramUserId String   // User who received the message
   sentAt        DateTime @default(now())
+  message       String?  // Message content
+  messageHour   String?  // Hour of broadcast (8 or 10)
+  action        String?  // Action taken (trial_created, broadcast_sent)
 
   @@unique([messageHash, telegramUserId])
   @@index([sentAt])
+  @@index([telegramUserId, sentAt])
 }
