@@ -58,17 +58,18 @@ export async function GET(request: NextRequest) {
           continue
         }
 
-        // Check for 24-hour deduplication
+        // Check for 24-hour deduplication for THIS specific message hour
         const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
         const recentBroadcast = await prisma.broadcastLog.findFirst({
           where: {
             telegramUserId: userId,
+            messageHour: hour,
             sentAt: { gte: twentyFourHoursAgo }
           }
         })
 
         if (recentBroadcast) {
-          console.log(`[Broadcast Cron] Skipping user ${userId} - sent broadcast within last 24 hours`)
+          console.log(`[Broadcast Cron] Skipping user ${userId} - sent ${hour}am broadcast within last 24 hours`)
           skippedCount++
           continue
         }
