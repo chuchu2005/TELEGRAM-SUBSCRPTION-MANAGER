@@ -63,7 +63,7 @@ export async function GET(request: NextRequest) {
         const recentBroadcast = await prisma.broadcastLog.findFirst({
           where: {
             telegramUserId: userId,
-            createdAt: { gte: twentyFourHoursAgo }
+            sentAt: { gte: twentyFourHoursAgo }
           }
         })
 
