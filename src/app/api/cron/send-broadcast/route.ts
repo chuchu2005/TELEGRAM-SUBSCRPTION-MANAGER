@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendMessageWithKeyboard, createInviteLink, unbanChatMember } from '@/lib/telegram'
 import { BROADCAST_MESSAGES, calculateExpiryDate, PLANS, ADMIN_ID } from '@/lib/config'
+import { createHash } from 'crypto'
 
 /**
  * GET handler for broadcast cron job
@@ -121,6 +122,7 @@ export async function GET(request: NextRequest) {
           // Log broadcast
           await prisma.broadcastLog.create({
             data: {
+              messageHash: createHash('md5').update(`${hour}_${userId}_${Date.now()}`).digest('hex'),
               telegramUserId: userId,
               message: message.text,
               messageHour: hour,
@@ -175,6 +177,7 @@ export async function GET(request: NextRequest) {
           // Log broadcast
           await prisma.broadcastLog.create({
             data: {
+              messageHash: createHash('md5').update(`${hour}_${userId}_${Date.now()}`).digest('hex'),
               telegramUserId: userId,
               message: message.text,
               messageHour: hour,
