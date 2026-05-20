@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { sendMessageWithKeyboard, createInviteLink, unbanChatMember } from '@/lib/telegram'
+import { sendMessageWithKeyboard, createInviteLink, unbanChatMember, sendMessage } from '@/lib/telegram'
 import { BROADCAST_MESSAGES, calculateExpiryDate, PLANS, ADMIN_ID } from '@/lib/config'
 import { createHash } from 'crypto'
 
@@ -115,6 +115,29 @@ export async function GET(request: NextRequest) {
     }
 
     console.log(`[Broadcast Cron] Completed ${hour}am broadcast. Processed=${processedCount}, Sent=${sentCount}, Failed=${failedCount}, Skipped=${skippedCount}`)
+
+    // Send summary to admin
+    try {
+      const summaryMessage = `📊 <b>Broadcast Summary - ${hour} AM Nigerian Time</b>
+
+━━━━━━━━━━━━━━━━━━━
+
+✅ <b>Successfully Sent:</b> ${sentCount}
+❌ <b>Failed:</b> ${failedCount}
+⏭️ <b>Skipped:</b> ${skippedCount}
+📝 <b>Total Processed:</b> ${processedCount}
+
+━━━━━━━━━━━━━━━━━━━
+
+<b>Timestamp:</b> ${now.toLocaleString('en-NG', { timeZone: 'Africa/Lagos' })}
+
+<i>${failedCount > 0 ? '⚠️ Some messages failed. Check logs for details.' : '✨ All messages sent successfully!'}</i>`
+
+      await sendMessage(ADMIN_ID.toString(), summaryMessage)
+      console.log('[Broadcast Cron] Summary sent to admin')
+    } catch (error) {
+      console.error('[Broadcast Cron] Failed to send summary to admin:', error)
+    }
 
     return NextResponse.json({
       success: true,
