@@ -294,21 +294,18 @@ Or type /pay to get started.`
           verifiedCount++
           console.log(`[Remove Expired Cron] Verified user ${userId} is actually removed (status: ${status})`)
         } else {
-          // User is still in channel! Reset for retry
-          verificationFailedCount++
-          console.log(`[Remove Expired Cron] VERIFICATION FAILED: User ${userId} is still in channel (status: ${status}) - resetting for retry`)
-
-          await prisma.subscription.update({
-            where: { id: subscription.id },
-            data: {
+          // User is still in channel! Check if they have an active subscription before banning
+          const hasOtherActiveSub = await prisma.subscription.findFirst({
+            where: {
+              telegramUserId: userId,
+              expiresAt: { gt: now },
               isRemoved: false,
-              removedAt: null
+              id: { not: subscription.id }
             }
           })
 
-          // Try to ban now
-          const banned = await banChatMember(userId)
-          if (banned) {
+          if (hasOtherActiveSub) {
+            // User has an active subscription - just mark this one as removed
             await prisma.subscription.update({
               where: { id: subscription.id },
               data: {
@@ -316,9 +313,35 @@ Or type /pay to get started.`
                 removedAt: now
               }
             })
-            console.log(`[Remove Expired Cron] Successfully removed ghost user ${userId} during verification`)
+            verifiedCount++
+            console.log(`[Remove Expired Cron] Verified user ${userId} has active subscription - marked old sub as removed`)
           } else {
-            console.log(`[Remove Expired Cron] Ban failed for ghost user ${userId}, will retry next run`)
+            // No active subscription - this is a ghost user, ban them
+            verificationFailedCount++
+            console.log(`[Remove Expired Cron] VERIFICATION FAILED: User ${userId} is still in channel (status: ${status}) - resetting for retry`)
+
+            await prisma.subscription.update({
+              where: { id: subscription.id },
+              data: {
+                isRemoved: false,
+                removedAt: null
+              }
+            })
+
+            // Try to ban now
+            const banned = await banChatMember(userId)
+            if (banned) {
+              await prisma.subscription.update({
+                where: { id: subscription.id },
+                data: {
+                  isRemoved: true,
+                  removedAt: now
+                }
+              })
+              console.log(`[Remove Expired Cron] Successfully removed ghost user ${userId} during verification`)
+            } else {
+              console.log(`[Remove Expired Cron] Ban failed for ghost user ${userId}, will retry next run`)
+            }
           }
         }
       } catch (error) {
