@@ -93,7 +93,8 @@ export async function GET(request: NextRequest) {
         }
 
         // Check for 24-hour deduplication for THIS specific message hour
-        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000)
+        // Add 1 second buffer to allow sending exactly 24 hours later
+        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000 - 1000)
         const recentBroadcast = await prisma.broadcastLog.findFirst({
           where: {
             telegramUserId: userId,
