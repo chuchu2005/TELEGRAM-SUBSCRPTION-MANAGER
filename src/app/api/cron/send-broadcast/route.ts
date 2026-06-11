@@ -92,23 +92,6 @@ export async function GET(request: NextRequest) {
           continue
         }
 
-        // Check for 24-hour deduplication for THIS specific message hour
-        // Add 1 second buffer to allow sending exactly 24 hours later
-        const twentyFourHoursAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000 - 1000)
-        const recentBroadcast = await prisma.broadcastLog.findFirst({
-          where: {
-            telegramUserId: userId,
-            messageHour: hour,
-            sentAt: { gte: twentyFourHoursAgo }
-          }
-        })
-
-        if (recentBroadcast) {
-          console.log(`[Broadcast Cron] Skipping user ${userId} - sent ${timeLabel} broadcast within last 24 hours`)
-          skippedCount++
-          continue
-        }
-
         // Send broadcast message with button to ALL users
         console.log(`[Broadcast Cron] Sending broadcast to user ${userId}`)
 
