@@ -18,7 +18,9 @@
       "WebSearch",
       "Bash(grep:*)",
       "Bash(npx prisma:*)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(rsync:*)",
+      "Bash(brew install:*)"
     ]
   }
 }
