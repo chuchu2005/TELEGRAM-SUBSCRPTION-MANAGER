@@ -1,0 +1,28 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // MUST match the Cloudflare Pages project name. The deployed Worker runs
+  // under this name, and the WORKER_SELF_REFERENCE service binding below must
+  // point at the same name. A name mismatch here ("vipbot" vs the project name)
+  // was the root cause of the original deploy error:
+  //   "Service binding 'WORKER_SELF_REFERENCE' references Worker 'vipbot'
+  //    which was not found [code 10143]".
+  "name": "telegram-subscrption-manager",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-09-23",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "services": [
+    {
+      // Self-reference service binding used by OpenNext for on-demand
+      // revalidation. The service name MUST equal the worker "name" above.
+      "binding": "WORKER_SELF_REFERENCE",
+      "service": "telegram-subscrption-manager"
+    }
+  ],
+  "images": {
+    "binding": "IMAGES"
+  }
+}

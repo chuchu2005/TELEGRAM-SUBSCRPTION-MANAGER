@@ -20,7 +20,13 @@
       "Bash(npx prisma:*)",
       "Bash(npm run:*)",
       "Bash(rsync:*)",
-      "Bash(brew install:*)"
+      "Bash(brew install:*)",
+      "Skill(deep-research)",
+      "mcp__exa__web_search_exa",
+      "mcp__firecrawl__firecrawl_search",
+      "Bash(xargs -I{} sh -c 'echo \"--- {} ---\"; cat \"{}\"')",
+      "mcp__koyebApi__list-apps",
+      "mcp__koyebApi__list-services"
     ]
   }
 }

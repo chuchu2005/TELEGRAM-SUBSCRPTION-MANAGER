@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "mongodb"
-  url      = env("DATABASE_URL")
+  provider  = "mongodb"
+  url       = env("DATABASE_URL")         // Runtime: Prisma Accelerate proxy URL (prisma://...) — required on Cloudflare Workers
+  directUrl = env("DIRECT_DATABASE_URL")  // Direct MongoDB (mongodb+srv://) for `prisma db push` / migrations
 }
 
 model PromoCode {

@@ -84,3 +84,47 @@ export async function cleanupOldBroadcastLogs(): Promise<number> {
 
   return result.count
 }
+
+/**
+ * Run an async worker over a list with bounded concurrency.
+ *
+ * This replaces the sequential `for (...) { await sendMessage(...); setTimeout(100) }`
+ * loops used by the broadcast paths. Those loops breach Cloudflare Workers limits
+ * on large recipient lists: the per-message sleep serializes everything (wall-clock
+ * = N * ~100ms+), and N outbound subrequests can exceed the per-request cap.
+ *
+ * Here, `concurrency` workers pull from a shared index, so sends run in parallel up
+ * to the cap with NO artificial sleep — fast enough to finish a typical list well
+ * inside a single Worker invocation. The worker is responsible for its own error
+ * handling and bookkeeping (counts); a throwing worker is swallowed so one bad
+ * recipient cannot abort the whole batch.
+ *
+ * @param items - Recipients (or any list) to process.
+ * @param worker - Async callback per item. Return void; track counts in the caller.
+ * @param concurrency - Max in-flight calls (default 8). Telegram allows ~30 msg/s
+ *   to distinct chats, so 8 concurrent keeps us safely under rate limits.
+ */
+export async function runBounded<T>(
+  items: T[],
+  worker: (item: T, index: number) => Promise<void>,
+  concurrency = 8
+): Promise<void> {
+  if (items.length === 0) return
+
+  let index = 0
+  const limit = Math.min(concurrency, items.length)
+
+  async function runner(): Promise<void> {
+    while (index < items.length) {
+      const my = index++
+      try {
+        await worker(items[my], my)
+      } catch (err) {
+        // A single failure must not break the rest of the batch.
+        console.error('[runBounded] worker error:', err)
+      }
+    }
+  }
+
+  await Promise.all(Array.from({ length: limit }, () => runner()))
+}

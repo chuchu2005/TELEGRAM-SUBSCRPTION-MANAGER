@@ -17,6 +17,9 @@
 /.next/
 /out/
 
+# opennext (Cloudflare build output — regenerated on every `build:cf`, never commit)
+/.open-next/
+
 # production
 /build
 

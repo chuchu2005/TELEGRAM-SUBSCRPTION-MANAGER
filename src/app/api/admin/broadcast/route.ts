@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendMessageWithKeyboard } from '@/lib/telegram'
 import { ADMIN_ID } from '@/lib/config'
-import { generateMessageHash, hasReceivedMessageRecently, logBroadcastMessage } from '@/lib/broadcast'
-import { BROADCAST_CONFIG } from '@/lib/broadcast-config'
+import { generateMessageHash, hasReceivedMessageRecently, logBroadcastMessage, runBounded } from '@/lib/broadcast'
 
 /**
  * POST /api/admin/broadcast
@@ -77,22 +76,38 @@ export async function POST(request: NextRequest) {
     let duplicateCount = 0
     const failedUsers: string[] = []
 
-    for (const subscription of subscriptions) {
+    // Send message to each user with bounded concurrency (replaces sequential loop + sleeps)
+    await runBounded(subscriptions, async (subscription) => {
       // Check for duplicate (deduplication)
       const hasReceived = await hasReceivedMessageRecently(subscription.telegramUserId, messageHash)
       if (hasReceived) {
         duplicateCount++
         console.log(`[Broadcast API] Skipped duplicate for user ${subscription.telegramUserId}`)
-        await new Promise(resolve => setTimeout(resolve, BROADCAST_CONFIG.RATE_LIMIT_MS))
-        continue
+        return
+      }
+
+      // Helper to send to this user (used for initial attempt + 429 retry)
+      const sendToUser = (): Promise<boolean> => {
+        if (replyMarkup) {
+          return sendMessageWithKeyboard(subscription.telegramUserId, message, replyMarkup)
+        }
+        return sendMessage(subscription.telegramUserId, message)
       }
 
       try {
         let sent: boolean
-        if (replyMarkup) {
-          sent = await sendMessageWithKeyboard(subscription.telegramUserId, message, replyMarkup)
-        } else {
-          sent = await sendMessage(subscription.telegramUserId, message)
+        try {
+          sent = await sendToUser()
+        } catch (error: any) {
+          // Handle Telegram rate limit (429 error) - wait, then retry this user once
+          if (error?.response?.status === 429) {
+            const retryAfter = error.response.data?.retry_after || 30
+            console.warn(`[Broadcast API] Rate limited, waiting ${retryAfter}s`)
+            await new Promise(resolve => setTimeout(resolve, retryAfter * 1000))
+            sent = await sendToUser()
+          } else {
+            throw error
+          }
         }
 
         if (sent) {
@@ -109,23 +124,12 @@ export async function POST(request: NextRequest) {
           failedUsers.push(subscription.telegramUsername || subscription.telegramUserId.toString())
         }
       } catch (error: any) {
-        // Handle Telegram rate limit (429 error)
-        if (error?.response?.status === 429) {
-          const retryAfter = error.response.data?.retry_after || 30
-          console.warn(`[Broadcast API] Rate limited, waiting ${retryAfter}s`)
-          await new Promise(resolve => setTimeout(resolve, retryAfter * 1000))
-          continue // Retry this user
-        }
-
-        // Handle other errors
+        // Handle other errors (including a second failure on 429 retry)
         failedCount++
         failedUsers.push(subscription.telegramUsername || subscription.telegramUserId.toString())
         console.error(`Failed to send to ${subscription.telegramUserId}:`, error)
       }
-
-      // Rate limiting delay
-      await new Promise(resolve => setTimeout(resolve, BROADCAST_CONFIG.RATE_LIMIT_MS))
-    }
+    }, 8)
 
     return NextResponse.json({
       success: true,

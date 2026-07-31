@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText, getChatMember } from '@/lib/telegram'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
@@ -10,6 +10,7 @@ import { settingsKeyboard, confirmSetupKeyboard, lotSizeKeyboard, maxLotKeyboard
 import { promoCreationKeyboard } from '@/lib/promo-keyboards'
 import { generateTradeStatistics, formatStatsMessage } from '@/lib/trade-stats'
 import { checkAndAwardReferralMilestone } from '@/lib/referral'
+import { runBounded } from '@/lib/broadcast'
 import type { TelegramUpdate, TelegramUser } from '@/lib/telegram'
 
 // Telegram file_id for reference.jpg image
@@ -1310,34 +1311,34 @@ Perfect for:
 
 <i>Don't miss this chance! Click below to get instant access!</i>`
 
-  for (const targetUser of allUsers) {
-    try {
-      // Send message with payment button
-      await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          chat_id: targetUser.telegramUserId,
-          text: promoMessage,
-          parse_mode: 'HTML',
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: '🔥 Get ₦3,000 Promo (7 Days)', callback_data: 'pay_promo' }
+  // Send to all users in the background (after the HTTP response on Cloudflare)
+  after(async () => {
+    await runBounded(allUsers, async (targetUser) => {
+      try {
+        // Send message with payment button
+        await fetch(`https://api.telegram.org/bot${process.env.TELEGRAM_BOT_TOKEN}/sendMessage`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            chat_id: targetUser.telegramUserId,
+            text: promoMessage,
+            parse_mode: 'HTML',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '🔥 Get ₦3,000 Promo (7 Days)', callback_data: 'pay_promo' }
+                ]
               ]
-            ]
-          }
+            }
+          })
         })
-      })
-      successCount++
-    } catch (error) {
-      failedCount++
-    }
+        successCount++
+      } catch (error) {
+        failedCount++
+      }
+    }, 8)
 
-    await new Promise(resolve => setTimeout(resolve, 100))
-  }
-
-  await sendMessage(user.id, `✅ <b>Promo Broadcast Complete!</b>
+    await sendMessage(user.id, `✅ <b>Promo Broadcast Complete!</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -1351,6 +1352,7 @@ Perfect for:
 • Links expire in ${expiryHours} hours
 • Each link works ONCE only
 • After expiry, send new broadcast for fresh links`)
+  })
 }
 
 /**
@@ -1402,7 +1404,7 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
   broadcastStartTime = Date.now()
 
   // 3. Start simplified background process
-  ;(async () => {
+  after(async () => {
     try {
       console.log('[Broadcast] Starting simplified broadcast...')
 
@@ -1456,16 +1458,13 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
       let successCount = 0
       let failedCount = 0
 
-      for (let i = 0; i < recipients.length; i++) {
-        const recipient = recipients[i]
-
+      await runBounded(recipients, async (recipient, i) => {
         // Check for cancellation
         if (shouldCancelBroadcast) {
-          await sendMessage(user.id, `🛑 <b>Broadcast Stopped!</b>`)
-          break
+          return
         }
 
-        // Send message with timeout
+        // Send message
         let sent = false
         try {
           if (buttonText && callbackData) {
@@ -1486,9 +1485,10 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
           failedCount++
           console.log(`[Broadcast] ✗ Failed to send to ${recipient.telegramUserId} (${i + 1}/${recipients.length})`)
         }
+      }, 8)
 
-        // Rate limiting delay (50ms for faster sending)
-        await new Promise(resolve => setTimeout(resolve, 50))
+      if (shouldCancelBroadcast) {
+        await sendMessage(user.id, `🛑 <b>Broadcast Stopped!</b>`)
       }
 
       // Send final summary
@@ -1503,7 +1503,7 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
       broadcastStartTime = null
       console.log('[Broadcast] Lock released')
     }
-  })()
+  })
 }
 
 /**

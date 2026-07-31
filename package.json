@@ -5,27 +5,32 @@
   "scripts": {
     "dev": "next dev",
     "build": "prisma generate && next build",
+    "build:cf": "prisma generate && opennextjs-cloudflare build",
     "start": "next start",
     "lint": "eslint",
-    "find-ghost-users": "node scripts/find-ghost-users.mjs"
+    "find-ghost-users": "node scripts/find-ghost-users.mjs",
+    "cf:preview": "opennextjs-cloudflare build && wrangler dev"
   },
   "dependencies": {
     "@prisma/client": "^6.19.0",
-    "next": "16.1.6",
+    "@prisma/extension-accelerate": "3.0.1",
+    "next": "16.2.12",
     "react": "19.2.3",
     "react-dom": "19.2.3"
   },
   "devDependencies": {
+    "@opennextjs/cloudflare": "1.20.2",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "babel-plugin-react-compiler": "1.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.1.6",
+    "eslint-config-next": "16.2.12",
     "ngrok": "^5.0.0-beta.2",
     "prisma": "^6.19.0",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "wrangler": "4.116.0"
   }
 }
