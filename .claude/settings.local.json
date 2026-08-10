@@ -26,7 +26,22 @@
       "mcp__firecrawl__firecrawl_search",
       "Bash(xargs -I{} sh -c 'echo \"--- {} ---\"; cat \"{}\"')",
       "mcp__koyebApi__list-apps",
-      "mcp__koyebApi__list-services"
+      "mcp__koyebApi__list-services",
+      "Bash(npx wrangler *)",
+      "Bash(rm -f /tmp/wr_tail.log)",
+      "Bash(nohup npx wrangler tail --format pretty)",
+      "Bash(echo \"tail pid: $!\")",
+      "Bash(pkill -f \"wrangler tail\")",
+      "Bash(rm -f /tmp/cron_tail.log)",
+      "Read(//tmp/**)",
+      "Bash(curl --max-time 25 -sS -o /tmp/sched_resp.txt -w 'HTTP %{http_code}\\\\n' https://vipbot-cron.peter-b50.workers.dev/__scheduled?cron=0+0+*+*+*)",
+      "Bash(pkill -f \"wrangler tail vipbot-cron\")",
+      "Bash(gh auth *)",
+      "Bash(gh workflow *)",
+      "Bash(rm -f /tmp/main_tail.log)",
+      "Bash(curl --max-time 20 -sS -o /dev/null -w \"hit: HTTP %{http_code}\\\\n\" -X POST \"https://telegram-subcrption-manager.peter-b50.workers.dev/api/telegram/webhook\" -H \"Content-Type: application/json\" -d '{}')",
+      "Bash(pkill -f \"wrangler tail telegram-subscrption-manager\")",
+      "Bash(git checkout *)"
     ]
   }
 }
