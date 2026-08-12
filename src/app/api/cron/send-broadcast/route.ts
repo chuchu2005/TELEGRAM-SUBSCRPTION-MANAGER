@@ -23,7 +23,7 @@ import { runBounded } from '@/lib/broadcast'
 const CONCURRENCY = Number(process.env.BROADCAST_CONCURRENCY) || 8
 const MAX_PER_INVOCATION = Number(process.env.BROADCAST_MAX_PER_INVOCATION) || 800
 
-type Hour = '8' | '10' | '20'
+type Hour = '9' | '12' | '15' | '21'
 interface TradeStats {
   message: string
   trades: number
@@ -40,67 +40,31 @@ interface ChunkArgs {
 }
 
 /**
- * Generate randomized trade summary message.
- * Replaces {trades} and {pips} placeholders with random values.
- */
-function generateTradeSummary(
-  template: string,
-  minTrades: number,
-  maxTrades: number,
-  minPips: number,
-  maxPips: number
-): TradeStats {
-  const trades = Math.floor(Math.random() * (maxTrades - minTrades + 1)) + minTrades
-  const pips = Math.floor(Math.random() * (maxPips - minPips + 1)) + minPips
-  const message = template.replace('{trades}', trades.toString()).replace('{pips}', pips.toString())
-  return { message, trades, pips }
-}
-
-/**
  * GET handler for broadcast cron job.
- * Sends broadcast messages to all users based on time (8am, 10am, or 8pm Nigerian).
- * Query parameter: ?hour=8, ?hour=10, or ?hour=20  (and ?offset= for internal pagination).
+ * Sends one of 4 daily drops (morning / TP-hit / afternoon / evening) — Nigerian (WAT).
+ * Query parameter: ?hour=9|12|15|21  (and ?offset= for internal pagination).
  */
 export async function GET(request: NextRequest) {
   try {
     const now = new Date()
     const searchParams = request.nextUrl.searchParams
-    const hourParam = searchParams.get('hour') || '8'
+    const hourParam = searchParams.get('hour') || '9'
     const offset = Math.max(0, Number(searchParams.get('offset')) || 0)
 
     // Validate hour parameter
-    const validHours: readonly Hour[] = ['8', '10', '20']
+    const validHours: readonly Hour[] = ['9', '12', '15', '21']
     if (!validHours.includes(hourParam as Hour)) {
       return NextResponse.json(
-        { error: 'Invalid hour parameter', message: 'Hour must be 8, 10, or 20' },
+        { error: 'Invalid hour parameter', message: 'Hour must be 9, 12, 15, or 21' },
         { status: 400 }
       )
     }
     const hour = hourParam as Hour
     const message = BROADCAST_MESSAGES[hour]
-
-    // Generate dynamic message for 8pm broadcast (hour='20')
-    let messageText = ''
-    let tradeStats: TradeStats | null = null
-    if (hour === '20' && 'template' in message) {
-      const ranges = message.tradeRanges
-      tradeStats = generateTradeSummary(
-        message.template,
-        ranges.minTrades,
-        ranges.maxTrades,
-        ranges.minPips,
-        ranges.maxPips
-      )
-      messageText = tradeStats.message
-      console.log(`[Broadcast Cron] Generated trade summary: ${tradeStats.trades} trade(s), ${tradeStats.pips} pips`)
-    } else if ('text' in message) {
-      messageText = message.text
-    } else {
-      messageText = message.template || ''
-    }
-
-    const timeLabel = hour === '20' ? '8 PM' : `${hour} AM`
+    const messageText = message.text
+    const timeLabel = message.label
     const buttonText = message.buttonText
+    const tradeStats: TradeStats | null = null
     console.log(`[Broadcast Cron] Scheduling ${timeLabel} broadcast at ${now.toISOString()} (offset=${offset})`)
 
     // Respond immediately; send in the background via after() (ctx.waitUntil).

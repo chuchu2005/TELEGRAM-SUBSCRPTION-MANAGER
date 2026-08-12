@@ -84,26 +84,31 @@ export function calculateExpiryDate(planType: PlanType, baseDate?: Date): Date {
   return expiryDate
 }
 
-// Broadcast Message Configuration
-// Can be overridden by environment variables: BROADCAST_8AM_TEXT, BROADCAST_10AM_TEXT, BROADCAST_8PM_TEMPLATE, BROADCAST_BUTTON_TEXT
+// Broadcast Message Configuration — 4 daily drops (WAT hours as keys).
+// Each send time also rotates within ~60 min of its target via vipbot-cron
+// (see cron-worker) so it doesn't read as fully automated.
+// Override via env: BROADCAST_MORNING_TEXT / BROADCAST_TPHIT_TEXT /
+// BROADCAST_AFTERNOON_TEXT / BROADCAST_EVENING_TEXT / BROADCAST_BUTTON_TEXT.
 export const BROADCAST_MESSAGES = {
-  '8': {
-    text: process.env.BROADCAST_8AM_TEXT || "1st XAUUSD Trade of the day just dropped in the VIP Group Now, Join now to take the trade",
-    buttonText: process.env.BROADCAST_BUTTON_TEXT || "Join Now"
+  '9': { // 9am WAT — morning trade
+    label: 'Morning',
+    text: process.env.BROADCAST_MORNING_TEXT || "📈 <b>The MORNING trade just dropped in the VIP group.</b>\n\nXAUUSD is moving right now — our VIPs are already in the trade while you read this. ⏳\n\nDon't watch today's profits pass you by.",
+    buttonText: process.env.BROADCAST_BUTTON_TEXT || "Join VIP"
   },
-  '10': {
-    text: process.env.BROADCAST_10AM_TEXT || "Tp4 just hit on the xauusd trade dropped in the vip",
-    buttonText: process.env.BROADCAST_BUTTON_TEXT || "Join Now"
+  '12': { // ~12pm WAT — TP-hit win recap
+    label: 'Midday',
+    text: process.env.BROADCAST_TPHIT_TEXT || "💰 <b>TP HIT on our XAUUSD call!</b>\n\nVIP members just took profit on this one — if you were in the group, you'd be up right now. 📊\n\nStop watching other people win. Join before the next signal drops.",
+    buttonText: process.env.BROADCAST_BUTTON_TEXT || "Join VIP"
   },
-  '20': {
-    template: process.env.BROADCAST_8PM_TEMPLATE || "📊 <b>Today's Trades In The VIP Group Summary</b>\n\n━━━━━━━━━━━━━━━━━━━\n\n<b>📈 Total Trades Today:</b> {trades}\n<b>💱 Pair:</b> XAUUSD\n<b>💰 Total Pips Profit:</b> {pips} pips\n\n━━━━━━━━━━━━━━━━━━━\n\n<b>Don't miss tomorrow's signals!</b>\nJoin VIP group now to catch the next winning trades.",
-    buttonText: process.env.BROADCAST_BUTTON_TEXT || "Join Now",
-    tradeRanges: {
-      minTrades: 1,
-      maxTrades: 2,
-      minPips: 1000,
-      maxPips: 2000
-    }
+  '15': { // 3pm WAT — afternoon trade
+    label: 'Afternoon',
+    text: process.env.BROADCAST_AFTERNOON_TEXT || "🔥 <b>AFTERNOON trade is LIVE in the VIP group.</b>\n\nThe session just opened up another XAUUSD setup — members are already positioned. ⚡\n\nEvery signal you miss is pips you'll never get back.",
+    buttonText: process.env.BROADCAST_BUTTON_TEXT || "Join VIP"
+  },
+  '21': { // 9pm WAT — evening trade
+    label: 'Evening',
+    text: process.env.BROADCAST_EVENING_TEXT || "🌙 <b>EVENING trade just dropped.</b>\n\nLast setup of the day is live in the VIP group — VIPs are locked in and ready to ride it. 🎯\n\nThe market doesn't wait, and the next call won't either.",
+    buttonText: process.env.BROADCAST_BUTTON_TEXT || "Join VIP"
   }
 } as const
 
