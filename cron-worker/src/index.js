@@ -5,14 +5,17 @@
 // handlers (the OpenNext worker at env.MAIN_URL). Keeping it separate means the
 // OpenNext worker is never touched and cron timing is owned by Cloudflare.
 
-// cron expression -> endpoint path (must match wrangler.jsonc triggers exactly)
+// cron expression -> endpoint path (must match wrangler.jsonc triggers exactly).
+// Cron runs in UTC. Broadcast intent is 8am/10am/8pm Nigerian (WAT = UTC+1),
+// so those fire at 07:00/09:00/19:00 UTC. Reminders at 08:00 UTC (9am WAT) to
+// avoid colliding with the 10am broadcast (both would otherwise be 09:00 UTC).
 const ENDPOINTS = {
-  "0 * * * *": "/api/cron/remove-expired",
-  "0 8 * * *": "/api/cron/send-broadcast?hour=8",
-  "0 10 * * *": "/api/cron/send-broadcast?hour=10",
-  "0 20 * * *": "/api/cron/send-broadcast?hour=20",
-  "0 9 * * *": "/api/cron/send-reminders",
-  "0 21 * * *": "/api/cron/send-referral-stats",
+  "0 * * * *": "/api/cron/remove-expired",          // every hour
+  "0 7 * * *": "/api/cron/send-broadcast?hour=8",   // 8am WAT
+  "0 8 * * *": "/api/cron/send-reminders",          // 9am WAT
+  "0 9 * * *": "/api/cron/send-broadcast?hour=10",  // 10am WAT
+  "0 19 * * *": "/api/cron/send-broadcast?hour=20", // 8pm WAT
+  "0 21 * * *": "/api/cron/send-referral-stats",    // 10pm WAT
 };
 
 // friendly name -> endpoint path, for the manual /run route

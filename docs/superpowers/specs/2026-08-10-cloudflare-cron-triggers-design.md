@@ -12,15 +12,17 @@
 ## Decision
 A small standalone worker `vipbot-cron` whose `scheduled()` handler POSTs to the main app's existing cron endpoints. The main app is **not modified** (no redeploy, no risk to the ngrok-vs-prod build-time URL).
 
-### Schedules (all UTC), one cron expression per job (account is on Workers paid plan — no 3-trigger cap)
-| Cron | Endpoint hit |
-|---|---|
-| `0 * * * *` | `/api/cron/remove-expired` |
-| `0 8 * * *` | `/api/cron/send-broadcast?hour=8` |
-| `0 10 * * *` | `/api/cron/send-broadcast?hour=10` |
-| `0 20 * * *` | `/api/cron/send-broadcast?hour=20` |
-| `0 9 * * *` | `/api/cron/send-reminders` |
-| `0 21 * * *` | `/api/cron/send-referral-stats` |
+### Schedules — cron runs in UTC; broadcast intent is Nigerian (WAT = UTC+1)
+One cron expression per job (Workers paid plan — no 3-trigger cap).
+
+| Cron (UTC) | WAT | Endpoint hit |
+|---|---|---|
+| `0 * * * *` | hourly | `/api/cron/remove-expired` |
+| `0 7 * * *` | 8am | `/api/cron/send-broadcast?hour=8` |
+| `0 8 * * *` | 9am | `/api/cron/send-reminders` (offset to avoid the 10am collision) |
+| `0 9 * * *` | 10am | `/api/cron/send-broadcast?hour=10` |
+| `0 19 * * *` | 8pm | `/api/cron/send-broadcast?hour=20` |
+| `0 21 * * *` | 10pm | `/api/cron/send-referral-stats` |
 
 `MAIN_URL` (the deployed OpenNext worker URL) is a plain wrangler `var`.
 
