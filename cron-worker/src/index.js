@@ -1,37 +1,59 @@
 // vipbot-cron — scheduled trigger for the vipbot app's cron endpoints.
 //
-// This worker contains NO application logic. On a schedule (or via the manual
-// /run route) it simply POSTs to the main app's existing /api/cron/* route
-// handlers (the OpenNext worker at env.MAIN_URL). Keeping it separate means the
-// OpenNext worker is never touched and cron timing is owned by Cloudflare.
+// Contains NO app logic: on a schedule (or via the manual /run route) it POSTs
+// to the main app's /api/cron/* handlers through a service binding (env.MAIN).
+//
+// Two kinds of jobs:
+//   • DIRECT — one cron expression -> one endpoint (remove-expired, reminders…).
+//   • WINDOWS — a broadcast that should land somewhere inside a ~60-min window
+//     and at a DIFFERENT minute each day (so it doesn't feel automated). Each
+//     window has N cron slots; per day exactly one slot is the "winner" chosen
+//     deterministically from the date, and only that slot fires the broadcast.
+//
+// All cron expressions are UTC. Broadcast targets are Nigerian (WAT = UTC+1).
 
-// cron expression -> endpoint path (must match wrangler.jsonc triggers exactly).
-// Cron runs in UTC. Broadcast intent is 8am/10am/8pm Nigerian (WAT = UTC+1),
-// so those fire at 07:00/09:00/19:00 UTC. Reminders at 08:00 UTC (9am WAT) to
-// avoid colliding with the 10am broadcast (both would otherwise be 09:00 UTC).
-const ENDPOINTS = {
-  "0 * * * *": "/api/cron/remove-expired",          // every hour
-  "0 7 * * *": "/api/cron/send-broadcast?hour=8",   // 8am WAT
-  "0 8 * * *": "/api/cron/send-reminders",          // 9am WAT
-  "0 9 * * *": "/api/cron/send-broadcast?hour=10",  // 10am WAT
-  "0 19 * * *": "/api/cron/send-broadcast?hour=20", // 8pm WAT
-  "0 21 * * *": "/api/cron/send-referral-stats",    // 10pm WAT
+// cron expression -> endpoint (fires every time)
+const DIRECT = {
+  "0 * * * *": "/api/cron/remove-expired",
+  "0 9 * * *": "/api/cron/send-reminders",     // 10am WAT
+  "0 21 * * *": "/api/cron/send-referral-stats", // 10pm WAT
 };
 
-// friendly name -> endpoint path, for the manual /run route
+// Broadcast windows. `hour` is the ?hour= value the main app uses to pick copy.
+// Each window's 5 slots span ~60 min around the target; one fires per day.
+//   morning   9am WAT -> 07:30–08:30 UTC
+//   tphit    12pm WAT -> 10:30–11:30 UTC
+//   afternoon 3pm WAT -> 13:30–14:30 UTC
+//   evening   9pm WAT -> 19:30–20:30 UTC
+const WINDOWS = [
+  { name: "morning",   hour: "9",  slots: ["30 7 * * *", "45 7 * * *", "0 8 * * *", "15 8 * * *", "30 8 * * *"] },
+  { name: "tphit",     hour: "12", slots: ["30 10 * * *", "45 10 * * *", "0 11 * * *", "15 11 * * *", "30 11 * * *"] },
+  { name: "afternoon", hour: "15", slots: ["30 13 * * *", "45 13 * * *", "0 14 * * *", "15 14 * * *", "30 14 * * *"] },
+  { name: "evening",   hour: "21", slots: ["30 19 * * *", "45 19 * * *", "0 20 * * *", "15 20 * * *", "30 20 * * *"] },
+];
+
+// friendly name -> endpoint, for the manual /run route
 const RUN_JOBS = {
   "remove-expired": "/api/cron/remove-expired",
   "send-reminders": "/api/cron/send-reminders",
   "referral-stats": "/api/cron/send-referral-stats",
-  "broadcast-8": "/api/cron/send-broadcast?hour=8",
-  "broadcast-10": "/api/cron/send-broadcast?hour=10",
-  "broadcast-20": "/api/cron/send-broadcast?hour=20",
+  "morning": "/api/cron/send-broadcast?hour=9",
+  "tphit": "/api/cron/send-broadcast?hour=12",
+  "afternoon": "/api/cron/send-broadcast?hour=15",
+  "evening": "/api/cron/send-broadcast?hour=21",
 };
 
+// Deterministic per-day slot pick: same date+window -> same slot, varies by date.
+function todaysSlot(scheduledTime, windowName, numSlots) {
+  let h = 0;
+  const key = `${windowName}|${new Date(scheduledTime).toDateString()}`;
+  for (let i = 0; i < key.length; i++) h = (h * 31 + key.charCodeAt(i)) >>> 0;
+  return h % numSlots;
+}
+
 async function hit(env, path, label = "[cron]", maxAttempts = 3) {
-  // Call the main app via a service binding (env.MAIN), NOT a public-URL fetch
-  // — same-account Worker-to-Worker fetches over *.workers.dev 1042. Only a 2xx
-  // counts as success; retry on anything else (incl. transient CF blips).
+  // Call the main app via the service binding (same-account *.workers.dev
+  // fetches 1042). Only a 2xx counts as success; retry on anything else.
   const url = `${env.MAIN_URL}${path}`;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -47,13 +69,11 @@ async function hit(env, path, label = "[cron]", maxAttempts = 3) {
     }
     if (attempt < maxAttempts) await new Promise((r) => setTimeout(r, 1000 * attempt));
   }
-  // Swallow final failure so ctx.waitUntil never rejects (avoids retry storms).
   console.error(`${label} ${path} failed after ${maxAttempts} attempts`);
   return { status: 0, body: "failed after retries" };
 }
 
 export default {
-  // Health/manual: GET / returns info; GET /run/<job>?secret=<CRON_SECRET> fires a job now.
   async fetch(request, env) {
     const url = new URL(request.url);
 
@@ -79,11 +99,28 @@ export default {
   },
 
   async scheduled(controller, env, ctx) {
-    const path = ENDPOINTS[controller.cron];
-    if (!path) {
-      console.warn(`[cron] unhandled cron expression: ${controller.cron}`);
+    // 1) Direct (every-fire) jobs.
+    const direct = DIRECT[controller.cron];
+    if (direct) {
+      ctx.waitUntil(hit(env, direct));
       return;
     }
-    ctx.waitUntil(hit(env, path));
+
+    // 2) Broadcast window slots — only today's picked slot fires.
+    for (const w of WINDOWS) {
+      const idx = w.slots.indexOf(controller.cron);
+      if (idx >= 0) {
+        const pick = todaysSlot(controller.scheduledTime, w.name, w.slots.length);
+        if (idx === pick) {
+          console.log(`[cron] ${w.name}: slot ${idx} is today's pick -> sending hour=${w.hour}`);
+          ctx.waitUntil(hit(env, `/api/cron/send-broadcast?hour=${w.hour}`));
+        } else {
+          console.log(`[cron] ${w.name}: slot ${idx} skipped (today's pick=${pick} of ${w.slots.length})`);
+        }
+        return;
+      }
+    }
+
+    console.warn(`[cron] unhandled cron expression: ${controller.cron}`);
   },
 };

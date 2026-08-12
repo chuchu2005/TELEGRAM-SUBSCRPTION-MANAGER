@@ -14,15 +14,18 @@
   "services": [
     { "binding": "MAIN", "service": "telegram-subscrption-manager" }
   ],
-  // One cron per job. Account is on the Workers paid plan (no 3-trigger cap).
+  // DIRECT jobs + 4 broadcast windows (5 slots each, ~60-min rotation).
+  // Times are UTC; broadcast targets are WAT (UTC+1). See src/index.js for the
+  // date-based per-day slot selection that makes send times vary day-to-day.
   "triggers": {
     "crons": [
       "0 * * * *",
-      "0 7 * * *",
-      "0 8 * * *",
       "0 9 * * *",
-      "0 19 * * *",
-      "0 21 * * *"
+      "0 21 * * *",
+      "30 7 * * *", "45 7 * * *", "0 8 * * *", "15 8 * * *", "30 8 * * *",
+      "30 10 * * *", "45 10 * * *", "0 11 * * *", "15 11 * * *", "30 11 * * *",
+      "30 13 * * *", "45 13 * * *", "0 14 * * *", "15 14 * * *", "30 14 * * *",
+      "30 19 * * *", "45 19 * * *", "0 20 * * *", "15 20 * * *", "30 20 * * *"
     ]
   }
 }
