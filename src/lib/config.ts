@@ -74,13 +74,14 @@ export function getPlan(planType: PlanType) {
 }
 
 // Helper function to calculate expiry date
-export function calculateExpiryDate(planType: PlanType, baseDate?: Date): Date {
+// durationDaysOverride lets promo codes grant their own duration instead of the plan default
+export function calculateExpiryDate(planType: PlanType, baseDate?: Date, durationDaysOverride?: number): Date {
   const plan = getPlan(planType)
   const now = new Date()
   const startFrom = (baseDate && baseDate > now) ? baseDate : now
 
   const expiryDate = new Date(startFrom)
-  expiryDate.setDate(expiryDate.getDate() + plan.durationDays)
+  expiryDate.setDate(expiryDate.getDate() + (durationDaysOverride ?? plan.durationDays))
   return expiryDate
 }
 

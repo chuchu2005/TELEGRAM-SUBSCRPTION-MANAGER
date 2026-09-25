@@ -1952,7 +1952,7 @@ Failed to generate payment link. Please try again or contact admin.`)
   }
 
   // 7. Create the subscription (for FREE promos)
-  const expiresAt = calculateExpiryDate(promo.planType as PlanType, currentExpiry)
+  const expiresAt = calculateExpiryDate(promo.planType as PlanType, currentExpiry, promo.durationDays)
 
   const newSubscription = await prisma.subscription.create({
     data: {
@@ -2196,7 +2196,7 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
       }
 
       if (customPromo.isFree) {
-        const expiresAt = calculateExpiryDate(customPromo.planType as PlanType, currentExpiry)
+        const expiresAt = calculateExpiryDate(customPromo.planType as PlanType, currentExpiry, customPromo.durationDays)
 
         const newSubscription = await prisma.subscription.create({
           data: {
