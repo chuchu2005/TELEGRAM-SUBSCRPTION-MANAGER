@@ -81,6 +81,12 @@ export function getAdminId(): number {
   return DEV_FALLBACK_ADMIN_TELEGRAM_ID
 }
 
+// Trade Statistics Configuration
+export const TRADE_STATS_CONFIG = {
+  enabled: true,
+  displayPosition: 'after_welcome', // Options: 'after_welcome', 'before_plans', 'after_plans'
+  showDisclaimer: true
+} as const
 
 // Trial Discount Configuration
 export const TRIAL_DISCOUNT = {

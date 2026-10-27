@@ -192,14 +192,14 @@ User has been removed from channel and MetaCopier.`)
 
 Thank you for trying our VIP signals!
 
-<b>We hope you found the signals useful!</b>
+<b>We hope you saw our 96% win rate on XAUUSD!</b>
 During your 24-hour trial, you received 3-4 high-quality Gold signals daily.
 
 ━━━━━━━━━━━━━━━━━━━
 
 ❌ <b>What You're Missing Now:</b>
 • No more XAUUSD signals (3-4 daily)
-• No more VIP trade alerts
+• No more 96% win rate trades
 • No entry/exit notifications
 • No premium community access
 
