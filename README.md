@@ -100,6 +100,9 @@ Edit `.env.local` with your credentials:
 TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
 TELEGRAM_CHANNEL_ID=your_channel_id
 
+# Admin identity (REQUIRED in production — see "Admin identity" below)
+ADMIN_TELEGRAM_ID=your_telegram_user_id
+
 # Paystack Configuration
 PAYSTACK_SECRET_KEY=sk_live_your_paystack_secret_key
 
@@ -243,6 +246,19 @@ The `vipbot-cron` worker (`cron-worker/src/index.js`) authenticates all calls
 to the app with the same `CRON_SECRET` from its own environment.
 
 ## Configuration
+
+### Admin identity
+
+All privileged bot commands (`/broadcast`, promo-code creation, `/checkuser`,
+`/remove_copier`) authorize on the Telegram user ID resolved by
+`getAdminId()` (`src/lib/config.ts`):
+
+- Production: the numeric `ADMIN_TELEGRAM_ID` env var is **required**. If it is
+  unset, resolving the admin identity throws (fail-closed) instead of trusting
+  the old value that used to be hardcoded in this public repository. Set it
+  with `wrangler secret put ADMIN_TELEGRAM_ID`.
+- Local development only: without the env var, `DEV_FALLBACK_ADMIN_TELEGRAM_ID`
+  in `src/lib/config.ts` is used so `npm run dev` works out of the box.
 
 ### Changing Plan Details
 

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, formatDate } from '@/lib/telegram'
-import { ADMIN_ID } from '@/lib/config'
+import { getAdminId } from '@/lib/config'
 
 /**
  * GET handler for daily referral stats cron job
@@ -106,7 +106,7 @@ export async function GET(request: NextRequest) {
 ━━━━━━━━━━━━━━━━━━━
 <i>This message is sent automatically to the admin.</i>`
 
-      await sendMessage(ADMIN_ID, adminSummary)
+      await sendMessage(getAdminId(), adminSummary)
     } catch (adminErr) {
       console.error('[Referral Stats Cron] Failed to notify admin:', adminErr)
     }

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendMessageWithKeyboard } from '@/lib/telegram'
-import { ADMIN_ID } from '@/lib/config'
+import { getAdminId } from '@/lib/config'
 import { generateMessageHash, hasReceivedMessageRecently, logBroadcastMessage, runBounded } from '@/lib/broadcast'
 
 /**
@@ -24,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     // If test mode, send only to specified user or admin
     if (testMode) {
-      const targetUserId = testUserId || ADMIN_ID
+      const targetUserId = testUserId || getAdminId()
       const sent = replyMarkup
         ? await sendMessageWithKeyboard(targetUserId, message, replyMarkup)
         : await sendMessage(targetUserId, message)

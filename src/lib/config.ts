@@ -50,8 +50,36 @@ export const CHANNEL_NAME = 'Pear VIP signals channel'
 export const GENERAL_CHANNEL_ID = '@pearforexsignals'
 export const GENERAL_CHANNEL_NAME = 'Pear Forex Signals'
 
-// Admin Telegram User ID (only this user can use /broadcast)
-export const ADMIN_ID = 5472144783
+// Admin Telegram User ID.
+//
+// [finding: forgeable_telegram_admin_identity] This value used to be hardcoded
+// here — in a public repository — while every privileged bot command
+// (/broadcast, promo-code creation, /checkuser, /remove_copier) authorized on
+// `from.id === ADMIN_ID`. It now resolves from the environment:
+//
+//   1. ADMIN_TELEGRAM_ID env var (numeric Telegram user ID) — REQUIRED in
+//      production. Set with: wrangler secret put ADMIN_TELEGRAM_ID
+//   2. In non-production (local dev / tests) only: the documented fallback
+//      below. This default exists purely so `npm run dev` works without
+//      extra setup; it must never be relied on in production.
+//
+// Fail-closed: calling getAdminId() in production without ADMIN_TELEGRAM_ID
+// throws instead of silently trusting a value committed to a public repo.
+export const DEV_FALLBACK_ADMIN_TELEGRAM_ID = 5472144783 // local development ONLY
+
+export function getAdminId(): number {
+  const fromEnv = process.env.ADMIN_TELEGRAM_ID
+  if (fromEnv && /^\d+$/.test(fromEnv.trim())) {
+    return Number(fromEnv.trim())
+  }
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error(
+      'ADMIN_TELEGRAM_ID is not set: refusing to resolve the admin identity in production. ' +
+      'Set ADMIN_TELEGRAM_ID (wrangler secret put ADMIN_TELEGRAM_ID) to the admin Telegram user ID.'
+    )
+  }
+  return DEV_FALLBACK_ADMIN_TELEGRAM_ID
+}
 
 // Trade Statistics Configuration
 export const TRADE_STATS_CONFIG = {

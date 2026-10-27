@@ -3,7 +3,7 @@ import { createHash } from 'crypto'
 import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessageWithKeyboard, sendMessage } from '@/lib/telegram'
-import { BROADCAST_MESSAGES, ADMIN_ID } from '@/lib/config'
+import { BROADCAST_MESSAGES, getAdminId } from '@/lib/config'
 import { runBounded } from '@/lib/broadcast'
 
 /**
@@ -101,7 +101,7 @@ export async function GET(request: NextRequest) {
  */
 async function runBroadcastChunk(args: ChunkArgs): Promise<void> {
   const { hour, messageText, buttonText, offset, timeLabel, startedAt, tradeStats } = args
-  const adminId = ADMIN_ID.toString()
+  const adminId = getAdminId().toString()
 
   // take MAX + 1 to detect whether more recipients remain after this chunk
   const users = await prisma.user.findMany({

@@ -3,7 +3,7 @@ import { isAuthorizedTelegramWebhook } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText, getChatMember } from '@/lib/telegram'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
-import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID, TRADE_STATS_CONFIG, TRIAL_DISCOUNT, GENERAL_CHANNEL_ID, GENERAL_CHANNEL_NAME } from '@/lib/config'
+import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, TRADE_STATS_CONFIG, TRIAL_DISCOUNT, GENERAL_CHANNEL_ID, GENERAL_CHANNEL_NAME, getAdminId } from '@/lib/config'
 import { createMt5Account, updateCopierSettings, removeUserMt5Account } from '@/lib/metacopier'
 import { encryptPassword, decryptPassword } from '@/lib/encryption'
 import { setConversationState, getConversationState, clearConversationState, advanceMt5SetupStep, advancePromoStep, updateConversationData, Mt5SetupStep } from '@/lib/conversation-state'
@@ -1202,7 +1202,7 @@ async function handleBroadcastActive(user: TelegramUser, args: string[]): Promis
  */
 async function handleTestCopierPromoBroadcast(user: TelegramUser): Promise<void> {
   // Check if user is admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only admin can use this command.')
     return
   }
@@ -1250,7 +1250,7 @@ Regular Price: <s>₦22,000</s>
  */
 async function handleBroadcastPromo(user: TelegramUser): Promise<void> {
   // Check if user is admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -1361,7 +1361,7 @@ Perfect for:
  */
 async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basic' | 'biweekly' | 'monthly' | 'all', activeOnly: boolean): Promise<void> {
   // Check if user is admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -1511,7 +1511,7 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
  * Handle /stop_broadcast command - Admin only
  */
 async function handleStopBroadcast(user: TelegramUser): Promise<void> {
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this.')
     return
   }
@@ -1531,7 +1531,7 @@ async function handleStopBroadcast(user: TelegramUser): Promise<void> {
  */
 async function handleBotStats(user: TelegramUser): Promise<void> {
   // Check if user is admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -1684,7 +1684,7 @@ ${joinedTodayDisplay}
  */
 async function handleCheckUser(admin: TelegramUser, args: string[]): Promise<void> {
   // Check if user is admin
-  if (admin.id !== ADMIN_ID) {
+  if (admin.id !== getAdminId()) {
     await sendMessage(admin.id, '❌ Only the admin can use this command.')
     return
   }
@@ -2064,7 +2064,7 @@ async function handlePromo(from: TelegramUser, args: string[]): Promise<void> {
   // Usage: /promo CODE
   if (!args[0]) {
     // Only show promo codes to admins
-    if (from.id === ADMIN_ID) {
+    if (from.id === getAdminId()) {
       await sendMessage(from.id, `🎁 <b>Promo Codes (Admin View)</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -2952,7 +2952,7 @@ Please try again later.`)
     console.log(`[Remove Copier] Database record deleted for user ${userId}, account ${accountNumber}`)
 
     // Send message to admin with account details for manual MetaCopier deletion
-    await sendMessage(ADMIN_ID, `🗑️ <b>Copier Removal Request - Database Deleted</b>
+    await sendMessage(getAdminId(), `🗑️ <b>Copier Removal Request - Database Deleted</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -3020,7 +3020,7 @@ async function handleCreatePromo(user: TelegramUser): Promise<void> {
   const userId = user.id.toString()
 
   // Check if admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -3075,7 +3075,7 @@ async function handleCreatePromoV2(user: TelegramUser): Promise<void> {
   const userId = user.id.toString()
 
   // Check if admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -3599,7 +3599,7 @@ async function handleListPromos(user: TelegramUser): Promise<void> {
   const userId = user.id.toString()
 
   // Check if admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -3646,7 +3646,7 @@ async function handleDeletePromo(user: TelegramUser, args: string[]): Promise<vo
   const userId = user.id.toString()
 
   // Check if admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
