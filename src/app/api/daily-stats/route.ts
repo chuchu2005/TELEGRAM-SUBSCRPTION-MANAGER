@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage } from '@/lib/telegram'
-import { TRADE_STATS_CONFIG, getAdminId } from '@/lib/config'
-import { generateTradeStatistics, formatStatsMessage } from '@/lib/trade-stats'
+import { getAdminId } from '@/lib/config'
+import { formatPerformanceSection } from '@/lib/trade-stats'
 
 /**
  * Daily Bot Statistics API Endpoint
@@ -107,12 +107,9 @@ export async function POST(request: NextRequest) {
       }
     })
 
-    // 12. Generate trade statistics if enabled
-    let statsSection = ''
-    if (TRADE_STATS_CONFIG.enabled) {
-      const stats = generateTradeStatistics()
-      statsSection = formatStatsMessage(stats)
-    }
+    // 12. Honest performance section — fabricated figures removed
+    // [finding: fabricated_performance_content]
+    const statsSection = formatPerformanceSection()
 
     // Format latest subscribers list
     let subsList = ''

@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
 ━━━━━━━━━━━━━━━━━━━
 
-You have been seeing our XAUUSD signals — the same signals that have been hitting 96% win rate consistently.
+You have been seeing our XAUUSD signals while your trial was active.
 
 Those signals stop when your trial ends.
 

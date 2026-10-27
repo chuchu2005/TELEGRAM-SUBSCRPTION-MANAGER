@@ -3,13 +3,13 @@ import { isAuthorizedTelegramWebhook } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText, getChatMember } from '@/lib/telegram'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
-import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, TRADE_STATS_CONFIG, TRIAL_DISCOUNT, GENERAL_CHANNEL_ID, GENERAL_CHANNEL_NAME, getAdminId } from '@/lib/config'
+import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, TRIAL_DISCOUNT, GENERAL_CHANNEL_ID, GENERAL_CHANNEL_NAME, getAdminId } from '@/lib/config'
 import { createMt5Account, updateCopierSettings, removeUserMt5Account } from '@/lib/metacopier'
 import { encryptPassword, decryptPassword } from '@/lib/encryption'
 import { setConversationState, getConversationState, clearConversationState, advanceMt5SetupStep, advancePromoStep, updateConversationData, Mt5SetupStep } from '@/lib/conversation-state'
 import { settingsKeyboard, confirmSetupKeyboard, lotSizeKeyboard, maxLotKeyboard, maxLotTotalKeyboard, maxPositionsKeyboard } from '@/lib/telegram-keyboards'
 import { promoCreationKeyboard } from '@/lib/promo-keyboards'
-import { generateTradeStatistics, formatStatsMessage } from '@/lib/trade-stats'
+import { formatPerformanceSection } from '@/lib/trade-stats'
 import { checkAndAwardReferralMilestone } from '@/lib/referral'
 import { runBounded } from '@/lib/broadcast'
 import type { TelegramUpdate, TelegramUser } from '@/lib/telegram'
@@ -294,12 +294,9 @@ Start sharing your link on your status or with trader friends now!`)
  * Handle /start command
  */
 async function handleStart(user: TelegramUser): Promise<void> {
-  // Generate trade statistics if enabled
-  let statsSection = ''
-  if (TRADE_STATS_CONFIG.enabled) {
-    const stats = generateTradeStatistics()
-    statsSection = formatStatsMessage(stats)
-  }
+  // Honest performance section — fabricated figures removed
+  // [finding: fabricated_performance_content]
+  const statsSection = formatPerformanceSection()
 
   const telegramUserId = user.id.toString()
 
@@ -337,7 +334,7 @@ ${statsSection}
 
 💎 <b>Gold (XAUUSD) Signals:</b>
 • 3-4 trades dropped daily
-• 96% win rate on XAUUSD
+• Delivered in real time
 • Premium quality signals
 • Entry/Exit points provided
 
@@ -346,7 +343,7 @@ ${statsSection}
 🎁 <b>Not Sure Yet? Try FREE for 24 Hours!</b>
 
 • Full access to VIP Gold (XAUUSD) signals
-• See 3-4 trades with 96% win rate
+• See 3-4 trades daily
 • Entry & Exit points included
 • No payment required
 • Cancel anytime
@@ -359,7 +356,7 @@ ${statsSection}
 
 📈 <b>Why Choose Our VIP Signals?</b>
 
-✅ 96% win rate on Gold (XAUUSD)
+✅ Gold (XAUUSD) signals
 ✅ 3-4 quality trades dropped daily
 ✅ Clear Entry & Exit points provided
 ✅ Professional trade analysis
@@ -507,7 +504,7 @@ Tap below to get started!`
 ✅ <b>What You Get:</b>
 • Access to VIP Gold (XAUUSD) signals
 • 3-4 high-quality signals daily
-• 96% win rate on Gold
+• Posted in the VIP channel
 • Entry & Exit points
 • Real-time trade notifications
 
@@ -589,7 +586,7 @@ Share your link → friend pays → <b>you get the same plan FREE!</b>
 A: Signals are posted in our VIP channel with clear Entry & Exit points.
 
 <i>Q: What's the win rate?</i>
-A: 96% win rate on Gold (XAUUSD) trades.
+A: No performance figures are published. Try the free 24-hour trial and judge the signals yourself.
 
 <i>Q: How many signals per day?</i>
 A: 3-4 quality trades dropped daily.
@@ -1223,7 +1220,7 @@ Regular Price: <s>₦22,000</s>
 ✅ <b>Automated bot that trades for you</b> - No manual work needed!
 ✅ <b>It analyzes trades and places them for you</b> as well
 ✅ <b>Same trades</b> from VIP signals channel
-✅ <b>96% win rate</b> on all trades
+✅ <b>Same entries & exits</b> as the VIP channel
 ✅ <b>Works 24/7</b> - even when your phone is OFF
 ✅ <b>Full 14 days</b> of automated trading
 
@@ -5733,7 +5730,7 @@ The MT5 Auto Copier feature is not available at this time.
 ✅ Join our VIP signals channel
 ✅ Copy trades manually at Entry & Exit points
 ✅ Learn trading strategies
-✅ Make profits with 96% win rate!
+✅ Follow the Entry & Exit points!
 
 ━━━━━━━━━━━━━━━━━━━
 
