@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage } from '@/lib/telegram'
 import { ADMIN_ID, TRADE_STATS_CONFIG } from '@/lib/config'
@@ -10,6 +11,9 @@ import { generateTradeStatistics, formatStatsMessage } from '@/lib/trade-stats'
  * Designed to be triggered by any cron service (cron-job.org, Vercel, etc.)
  */
 export async function POST(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
 
     // Collect daily statistics
@@ -222,6 +226,9 @@ Error generating daily statistics report.
  * GET handler - for testing
  */
 export async function GET(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   return NextResponse.json({
     status: 'Daily stats endpoint is running',
     usage: 'Send POST request to trigger daily stats'

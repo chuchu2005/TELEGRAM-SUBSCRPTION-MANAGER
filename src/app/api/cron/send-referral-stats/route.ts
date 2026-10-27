@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, formatDate } from '@/lib/telegram'
 import { ADMIN_ID } from '@/lib/config'
@@ -8,6 +9,9 @@ import { ADMIN_ID } from '@/lib/config'
  * Sends referral summary to users who have had activity in the last 30 days
  */
 export async function GET(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const now = new Date()
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)

@@ -106,7 +106,7 @@ PAYSTACK_SECRET_KEY=sk_live_your_paystack_secret_key
 # Database Configuration
 DATABASE_URL=mongodb+srv://username:password@cluster.mongodb.net/database
 
-# Cron Security
+# Cron & Admin Route Security (required — routes fail closed with 401 without it)
 CRON_SECRET=generate_a_random_secret_string_here
 
 # Application Configuration
@@ -208,11 +208,24 @@ https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook?url=https://your-domain.co
 - **Method:** `POST`
 - **Description:** Receives Paystack payment events (backup flow)
 
-### Cron Job
-- **URL:** `/api/cron/remove-expired`
-- **Method:** `GET`
-- **Schedule:** Every hour (`0 * * * *`)
-- **Auth:** Bearer token (`CRON_SECRET`)
+### Cron Job / Admin Endpoints
+- **URLs:** `/api/cron/remove-expired`, `/api/cron/send-broadcast`, `/api/cron/send-reminders`, `/api/cron/send-referral-stats`, `/api/admin/broadcast`, `/api/daily-stats`
+- **Method:** `GET` (cron) / `POST` (broadcast, daily-stats)
+- **Schedule:** driven by the `cron-worker` Worker (see `cron-worker/`)
+- **Auth:** `Authorization: Bearer <CRON_SECRET>` — enforced on every route above.
+  Requests without the header, with a wrong token, or when `CRON_SECRET` is not
+  configured are rejected with **401** (fail-closed).
+
+Set the secret for BOTH workers (the app checks it on every privileged route;
+the cron worker sends it on every scheduled call):
+
+```bash
+wrangler secret put CRON_SECRET          # app worker (this repo's wrangler.jsonc)
+cd cron-worker && wrangler secret put CRON_SECRET
+```
+
+The `vipbot-cron` worker (`cron-worker/src/index.js`) authenticates all calls
+to the app with the same `CRON_SECRET` from its own environment.
 
 ## Configuration
 
@@ -319,5 +332,6 @@ MIT
 ## Support
 
 For issues or questions, please open an issue on GitHub.
-#   T E L E G R A M - S U B S C R P T I O N - M A N A G E R  
+#   T E L E G R A M - S U B S C R P T I O N - M A N A G E R 
+ 
  

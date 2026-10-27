@@ -10,7 +10,9 @@
 
 import 'dotenv/config'
 
-const ADMIN_SECRET = process.env.ADMIN_SECRET
+// The server now enforces `Authorization: Bearer <CRON_SECRET>` (fail-closed)
+// on /api/admin/broadcast. ADMIN_SECRET was never checked by the server.
+const CRON_SECRET = process.env.CRON_SECRET
 const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
 
 // Parse command line arguments
@@ -58,7 +60,7 @@ try {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Authorization': `Bearer ${ADMIN_SECRET}`
+      'Authorization': `Bearer ${CRON_SECRET}`
     },
     body: JSON.stringify({
       message,

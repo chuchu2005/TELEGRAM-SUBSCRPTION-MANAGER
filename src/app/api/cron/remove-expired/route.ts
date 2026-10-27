@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { banChatMember, sendMessage, sendMessageWithKeyboard, getChatMember } from '@/lib/telegram'
 import { removeUserMt5Account } from '@/lib/metacopier'
@@ -8,9 +9,12 @@ const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID!
 
 /**
  * GET handler for cron job to remove expired users
- * Open endpoint - no authentication required
+ * Auth: Bearer token (CRON_SECRET) — fail-closed (401 when unset or mismatched)
  */
 export async function GET(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     console.log(`[Remove Expired Cron] Starting at ${new Date().toISOString()}`)
 

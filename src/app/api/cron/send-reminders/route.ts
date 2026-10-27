@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendMessageWithKeyboard, formatDate } from '@/lib/telegram'
 import { PLANS } from '@/lib/config'
@@ -8,6 +9,9 @@ import { PLANS } from '@/lib/config'
  * Handles both paid plan reminders (2 days before) and trial reminders (6 hours before)
  */
 export async function GET(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const now = new Date()
     let reminderCount = 0

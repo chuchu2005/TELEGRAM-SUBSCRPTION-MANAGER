@@ -54,10 +54,20 @@ function todaysSlot(scheduledTime, windowName, numSlots) {
 async function hit(env, path, label = "[cron]", maxAttempts = 3) {
   // Call the main app via the service binding (same-account *.workers.dev
   // fetches 1042). Only a 2xx counts as success; retry on anything else.
+  //
+  // The main app's /api/cron/* endpoints now require
+  // `Authorization: Bearer <CRON_SECRET>` (fail-closed), so every call MUST
+  // carry the same secret this worker uses for its own /run trigger.
   const url = `${env.MAIN_URL}${path}`;
+  const headers = {};
+  if (env.CRON_SECRET) {
+    headers["Authorization"] = `Bearer ${env.CRON_SECRET}`;
+  } else {
+    console.error(`${label} env.CRON_SECRET is not set; the main app will reject these calls with 401`);
+  }
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
-      const res = await env.MAIN.fetch(url, { method: "POST" });
+      const res = await env.MAIN.fetch(url, { method: "POST", headers });
       const body = await res.text().catch(() => "");
       if (res.status >= 200 && res.status < 300) {
         console.log(`${label} ${path} -> ${res.status} ${body.slice(0, 120)}`);

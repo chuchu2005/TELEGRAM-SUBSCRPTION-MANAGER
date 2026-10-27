@@ -8,6 +8,8 @@
     "build:cf": "prisma generate && opennextjs-cloudflare build",
     "start": "next start",
     "lint": "eslint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "find-ghost-users": "node scripts/find-ghost-users.mjs",
     "cf:preview": "opennextjs-cloudflare build && wrangler dev"
   },
@@ -31,6 +33,7 @@
     "prisma": "^6.19.0",
     "tailwindcss": "^4",
     "typescript": "^5",
+    "vitest": "^3.2.7",
     "wrangler": "4.116.0"
   }
 }
