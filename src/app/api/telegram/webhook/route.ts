@@ -1,4 +1,5 @@
 import { after, NextRequest, NextResponse } from 'next/server'
+import { isAuthorizedTelegramWebhook } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText, getChatMember } from '@/lib/telegram'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
@@ -4967,6 +4968,15 @@ Please try again or contact support if the problem persists.`)
  * POST handler for Telegram webhook
  */
 export async function POST(request: NextRequest) {
+  // [finding: forgeable_telegram_admin_identity] Reject any request that does
+  // not carry Telegram's secret token. Telegram sets `secret_token` via
+  // setWebhook and then includes it in the X-Telegram-Bot-Api-Secret-Token
+  // header of every update. Fail-closed: 401 when TELEGRAM_WEBHOOK_SECRET is
+  // unset or the header is missing/mismatched — checked BEFORE the body is
+  // read, so unauthenticated callers cannot get any update processed.
+  if (!isAuthorizedTelegramWebhook(request)) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const body: TelegramUpdate = await request.json()
 

@@ -202,6 +202,21 @@ https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook?url=https://your-domain.co
 - **URL:** `/api/telegram/webhook`
 - **Method:** `POST`
 - **Description:** Receives all Telegram bot updates
+- **Auth:** Telegram's secret token. The endpoint compares the
+  `X-Telegram-Bot-Api-Secret-Token` header against `TELEGRAM_WEBHOOK_SECRET`
+  (constant-time, fail-closed: **401** when the env var is unset or the
+  header is missing/mismatched). Requests without a valid token are rejected
+  before the update body is read.
+
+**One-time setup after deploy** — register the webhook with the same secret:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "<WORKER_URL>/api/telegram/webhook", "secret_token": "<TELEGRAM_WEBHOOK_SECRET>", "allowed_updates": ["message","callback_query"]}'
+```
+
+Set the secret on the app worker as well: `wrangler secret put TELEGRAM_WEBHOOK_SECRET`.
 
 ### Paystack Webhook (Optional)
 - **URL:** `/api/paystack/webhook`
