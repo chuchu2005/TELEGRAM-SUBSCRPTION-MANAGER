@@ -8,8 +8,17 @@ const APP_URL = process.env.NEXT_PUBLIC_APP_URL!
 export interface CreatePaymentLinkRequest {
   telegramId: string
   telegramUsername?: string
-  planType: PlanType
+  /** A PLANS key, or a custom plan label (e.g. 'custom' for paid promos) — in which case amountKobo must be supplied. */
+  planType: string
   email?: string
+  /**
+   * [finding: paid_promo_billing_defect] Explicit amount in kobo.
+   * Required for custom plan types (paid promos) and overrides the plan price
+   * for known plans (promo discounts). Without it, the price comes from PLANS.
+   */
+  amountKobo?: number
+  /** Extra metadata (e.g. { promoCode }) merged into the Paystack metadata. */
+  metadata?: Record<string, unknown>
 }
 
 export interface PaystackInitResponse {
@@ -22,14 +31,26 @@ export interface PaystackInitResponse {
   }
 }
 
+function titleCase(value: string): string {
+  return value.charAt(0).toUpperCase() + value.slice(1)
+}
+
 /**
  * POST /api/payment/link
- * Creates a Paystack payment link with bank transfer only
+ * Creates a Paystack payment link with bank transfer only.
+ *
+ * Amount resolution [finding: paid_promo_billing_defect]:
+ *  - explicit `amountKobo` in the body wins (promo/custom pricing) — must be a
+ *    positive integer in kobo;
+ *  - otherwise the caller's `planType` must be a PLANS key and its configured
+ *    price is used (with the trial-discount check for standard paid plans);
+ *  - unknown plan types WITHOUT an explicit amount return a clear 400 instead
+ *    of throwing a 500.
  */
 export async function POST(request: NextRequest) {
   try {
     const body: CreatePaymentLinkRequest = await request.json()
-    const { telegramId, telegramUsername, planType, email } = body
+    const { telegramId, telegramUsername, planType, email, amountKobo: callerAmountKobo, metadata: callerMetadata } = body
 
     if (!telegramId || !planType) {
       return NextResponse.json(
@@ -38,37 +59,66 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Get plan details
-    const plan = PLANS[planType]
-    const planName = plan.name.charAt(0).toUpperCase() + plan.name.slice(1)
-    let amountKobo: number = plan.amountKobo
+    const knownPlan = Object.prototype.hasOwnProperty.call(PLANS, planType)
+      ? PLANS[planType as PlanType]
+      : undefined
 
-    // Check discount eligibility if it's a standard paid plan (not promo or trial)
-    if (planType !== 'trial' && planType !== 'promo' && TRIAL_DISCOUNT.enabled) {
-      const now = new Date()
-      const twentyFourHoursAgo = new Date(now.getTime() - (TRIAL_DISCOUNT.discountDurationHours * 60 * 60 * 1000))
+    let amountKobo: number
+    let planName: string
 
-      const recentTrial = await prisma.subscription.findFirst({
-        where: {
-          telegramUserId: telegramId.toString(),
-          planType: 'trial',
-          expiresAt: { gte: twentyFourHoursAgo }
-        },
-        orderBy: { expiresAt: 'desc' }
-      })
+    if (callerAmountKobo !== undefined) {
+      if (!Number.isInteger(callerAmountKobo) || callerAmountKobo <= 0) {
+        return NextResponse.json(
+          { error: 'Invalid amountKobo: must be a positive integer amount in kobo' },
+          { status: 400 }
+        )
+      }
+      amountKobo = callerAmountKobo
+      planName = knownPlan ? titleCase(knownPlan.name) : titleCase(planType)
+    } else {
+      if (!knownPlan) {
+        return NextResponse.json(
+          {
+            error: `Unknown plan type '${planType}'. Valid plans: ${Object.keys(PLANS).join(', ')} — or pass an explicit amountKobo for custom/promo pricing.`
+          },
+          { status: 400 }
+        )
+      }
+      planName = titleCase(knownPlan.name)
+      amountKobo = knownPlan.amountKobo
 
-      if (recentTrial && recentTrial.expiresAt >= twentyFourHoursAgo) {
-        const hoursSinceTrial = Math.floor((now.getTime() - recentTrial.expiresAt.getTime()) / (60 * 60 * 1000))
-        const hoursRemaining = Math.max(0, TRIAL_DISCOUNT.discountDurationHours - hoursSinceTrial)
-        if (hoursRemaining > 0) {
-          // Apply 20% discount
-          amountKobo = Math.floor(amountKobo * (1 - TRIAL_DISCOUNT.discountPercent / 100))
+      // Check discount eligibility if it's a standard paid plan (not promo or trial)
+      if (planType !== 'trial' && planType !== 'promo' && TRIAL_DISCOUNT.enabled) {
+        const now = new Date()
+        const twentyFourHoursAgo = new Date(now.getTime() - (TRIAL_DISCOUNT.discountDurationHours * 60 * 60 * 1000))
+
+        const recentTrial = await prisma.subscription.findFirst({
+          where: {
+            telegramUserId: telegramId.toString(),
+            planType: 'trial',
+            expiresAt: { gte: twentyFourHoursAgo }
+          },
+          orderBy: { expiresAt: 'desc' }
+        })
+
+        if (recentTrial && recentTrial.expiresAt >= twentyFourHoursAgo) {
+          const hoursSinceTrial = Math.floor((now.getTime() - recentTrial.expiresAt.getTime()) / (60 * 60 * 1000))
+          const hoursRemaining = Math.max(0, TRIAL_DISCOUNT.discountDurationHours - hoursSinceTrial)
+          if (hoursRemaining > 0) {
+            // Apply the configured trial-upgrade discount
+            amountKobo = Math.floor(amountKobo * (1 - TRIAL_DISCOUNT.discountPercent / 100))
+          }
         }
       }
     }
 
     // Use provided email or fallback
     const customerEmail = email || `customer_${telegramId}@example.com`
+
+    const promoMetadata: Record<string, unknown> =
+      callerMetadata && typeof callerMetadata === 'object' && !Array.isArray(callerMetadata)
+        ? callerMetadata
+        : {}
 
     // Initialize transaction with Paystack
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -83,6 +133,9 @@ export async function POST(request: NextRequest) {
         currency: 'NGN',
         channels: ['bank_transfer'], // ONLY bank transfer
         metadata: {
+          // Caller-supplied promo/custom metadata first, canonical fields win
+          // on key collisions so the payload stays self-describing.
+          ...promoMetadata,
           product: 'telegram_bot_subscription',
           plan_type: planType,
           telegram_id: telegramId,

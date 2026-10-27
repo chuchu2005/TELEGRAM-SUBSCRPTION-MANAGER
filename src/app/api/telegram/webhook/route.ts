@@ -1103,7 +1103,9 @@ async function showCopierPromoPaymentButton(user: TelegramUser, email: string): 
         telegramId: telegramUserId,
         telegramUsername,
         planType: 'copier24hr',
-        email
+        amountKobo: 1500000, // ₦15,000 promo price [finding: paid_promo_billing_defect] ('copier24hr' is not a PLANS key)
+        email,
+        metadata: { promoCode: 'copier24hr' }
       })
     })
 
@@ -2251,6 +2253,7 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
             telegramId: userId,
             telegramUsername: user.username || 'unknown',
             planType: 'custom',
+            amountKobo: customPromo.amountKobo || 0, // [finding: paid_promo_billing_defect] the route prices from this — never the PLANS table
             email: `${user.username || 'user'}@pearsignals.com`,
             metadata: { promoCode: promoCode, customPromoId: customPromo.id }
           })
