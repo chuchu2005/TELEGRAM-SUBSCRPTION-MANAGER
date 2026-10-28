@@ -1,8 +1,9 @@
 import { after, NextRequest, NextResponse } from 'next/server'
+import { isAuthorizedTelegramWebhook } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendPhoto, createInviteLink, formatDate, getDaysRemaining, unbanChatMember, sendMessageWithKeyboard, answerCallbackQuery, editMessageText, getChatMember } from '@/lib/telegram'
 import { verifyTransaction, validatePaymentAmount, validatePaymentChannel, formatAmount } from '@/lib/paystack'
-import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, ADMIN_ID, TRADE_STATS_CONFIG, TRIAL_DISCOUNT, GENERAL_CHANNEL_ID, GENERAL_CHANNEL_NAME } from '@/lib/config'
+import { PLANS, PlanType, BANK_DETAILS, CHANNEL_NAME, RATE_LIMIT, calculateExpiryDate, TRADE_STATS_CONFIG, TRIAL_DISCOUNT, GENERAL_CHANNEL_ID, GENERAL_CHANNEL_NAME, getAdminId } from '@/lib/config'
 import { createMt5Account, updateCopierSettings, removeUserMt5Account } from '@/lib/metacopier'
 import { encryptPassword, decryptPassword } from '@/lib/encryption'
 import { setConversationState, getConversationState, clearConversationState, advanceMt5SetupStep, advancePromoStep, updateConversationData, Mt5SetupStep } from '@/lib/conversation-state'
@@ -1105,7 +1106,9 @@ async function showCopierPromoPaymentButton(user: TelegramUser, email: string): 
         telegramId: telegramUserId,
         telegramUsername,
         planType: 'copier24hr',
-        email
+        amountKobo: 1500000, // ₦15,000 promo price [finding: paid_promo_billing_defect] ('copier24hr' is not a PLANS key)
+        email,
+        metadata: { promoCode: 'copier24hr' }
       })
     })
 
@@ -1201,7 +1204,7 @@ async function handleBroadcastActive(user: TelegramUser, args: string[]): Promis
  */
 async function handleTestCopierPromoBroadcast(user: TelegramUser): Promise<void> {
   // Check if user is admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only admin can use this command.')
     return
   }
@@ -1249,7 +1252,7 @@ Regular Price: <s>₦22,000</s>
  */
 async function handleBroadcastPromo(user: TelegramUser): Promise<void> {
   // Check if user is admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -1360,7 +1363,7 @@ Perfect for:
  */
 async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basic' | 'biweekly' | 'monthly' | 'all', activeOnly: boolean): Promise<void> {
   // Check if user is admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -1510,7 +1513,7 @@ async function sendBroadcast(user: TelegramUser, args: string[], planType: 'basi
  * Handle /stop_broadcast command - Admin only
  */
 async function handleStopBroadcast(user: TelegramUser): Promise<void> {
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this.')
     return
   }
@@ -1530,7 +1533,7 @@ async function handleStopBroadcast(user: TelegramUser): Promise<void> {
  */
 async function handleBotStats(user: TelegramUser): Promise<void> {
   // Check if user is admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -1683,7 +1686,7 @@ ${joinedTodayDisplay}
  */
 async function handleCheckUser(admin: TelegramUser, args: string[]): Promise<void> {
   // Check if user is admin
-  if (admin.id !== ADMIN_ID) {
+  if (admin.id !== getAdminId()) {
     await sendMessage(admin.id, '❌ Only the admin can use this command.')
     return
   }
@@ -2063,7 +2066,7 @@ async function handlePromo(from: TelegramUser, args: string[]): Promise<void> {
   // Usage: /promo CODE
   if (!args[0]) {
     // Only show promo codes to admins
-    if (from.id === ADMIN_ID) {
+    if (from.id === getAdminId()) {
       await sendMessage(from.id, `🎁 <b>Promo Codes (Admin View)</b>
 
 ━━━━━━━━━━━━━━━━━━━
@@ -2253,6 +2256,7 @@ async function handleVerify(user: TelegramUser, reference: string, planType: Pla
             telegramId: userId,
             telegramUsername: user.username || 'unknown',
             planType: 'custom',
+            amountKobo: customPromo.amountKobo || 0, // [finding: paid_promo_billing_defect] the route prices from this — never the PLANS table
             email: `${user.username || 'user'}@pearsignals.com`,
             metadata: { promoCode: promoCode, customPromoId: customPromo.id }
           })
@@ -2951,7 +2955,7 @@ Please try again later.`)
     console.log(`[Remove Copier] Database record deleted for user ${userId}, account ${accountNumber}`)
 
     // Send message to admin with account details for manual MetaCopier deletion
-    await sendMessage(ADMIN_ID, `🗑️ <b>Copier Removal Request - Database Deleted</b>
+    await sendMessage(getAdminId(), `🗑️ <b>Copier Removal Request - Database Deleted</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -3019,7 +3023,7 @@ async function handleCreatePromo(user: TelegramUser): Promise<void> {
   const userId = user.id.toString()
 
   // Check if admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -3074,7 +3078,7 @@ async function handleCreatePromoV2(user: TelegramUser): Promise<void> {
   const userId = user.id.toString()
 
   // Check if admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -3598,7 +3602,7 @@ async function handleListPromos(user: TelegramUser): Promise<void> {
   const userId = user.id.toString()
 
   // Check if admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -3645,7 +3649,7 @@ async function handleDeletePromo(user: TelegramUser, args: string[]): Promise<vo
   const userId = user.id.toString()
 
   // Check if admin
-  if (user.id !== ADMIN_ID) {
+  if (user.id !== getAdminId()) {
     await sendMessage(user.id, '❌ Only the admin can use this command.')
     return
   }
@@ -4967,6 +4971,15 @@ Please try again or contact support if the problem persists.`)
  * POST handler for Telegram webhook
  */
 export async function POST(request: NextRequest) {
+  // [finding: forgeable_telegram_admin_identity] Reject any request that does
+  // not carry Telegram's secret token. Telegram sets `secret_token` via
+  // setWebhook and then includes it in the X-Telegram-Bot-Api-Secret-Token
+  // header of every update. Fail-closed: 401 when TELEGRAM_WEBHOOK_SECRET is
+  // unset or the header is missing/mismatched — checked BEFORE the body is
+  // read, so unauthenticated callers cannot get any update processed.
+  if (!isAuthorizedTelegramWebhook(request)) {
+    return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const body: TelegramUpdate = await request.json()
 

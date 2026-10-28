@@ -1,8 +1,9 @@
 import { after, NextRequest, NextResponse } from 'next/server'
 import { createHash } from 'crypto'
+import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessageWithKeyboard, sendMessage } from '@/lib/telegram'
-import { BROADCAST_MESSAGES, ADMIN_ID } from '@/lib/config'
+import { BROADCAST_MESSAGES, getAdminId } from '@/lib/config'
 import { runBounded } from '@/lib/broadcast'
 
 /**
@@ -45,6 +46,9 @@ interface ChunkArgs {
  * Query parameter: ?hour=9|12|15|21  (and ?offset= for internal pagination).
  */
 export async function GET(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     const now = new Date()
     const searchParams = request.nextUrl.searchParams
@@ -97,7 +101,7 @@ export async function GET(request: NextRequest) {
  */
 async function runBroadcastChunk(args: ChunkArgs): Promise<void> {
   const { hour, messageText, buttonText, offset, timeLabel, startedAt, tradeStats } = args
-  const adminId = ADMIN_ID.toString()
+  const adminId = getAdminId().toString()
 
   // take MAX + 1 to detect whether more recipients remain after this chunk
   const users = await prisma.user.findMany({
@@ -167,8 +171,14 @@ async function runBroadcastChunk(args: ChunkArgs): Promise<void> {
     // Worker invocation with its own CPU/subrequest budget.
     const base = process.env.NEXT_PUBLIC_APP_URL || ''
     const nextUrl = `${base}/api/cron/send-broadcast?hour=${hour}&offset=${offset + MAX_PER_INVOCATION}`
+    // Chained chunks must authenticate with the same CRON_SECRET gate the
+    // endpoint now enforces for everyone else.
+    const cronAuthHeaders: Record<string, string> = {}
+    if (process.env.CRON_SECRET) {
+      cronAuthHeaders['Authorization'] = `Bearer ${process.env.CRON_SECRET}`
+    }
     after(() =>
-      fetch(nextUrl, { method: 'GET' }).catch((e) =>
+      fetch(nextUrl, { method: 'GET', headers: cronAuthHeaders }).catch((e) =>
         console.error('[Broadcast Cron] pagination fetch failed:', e)
       )
     )

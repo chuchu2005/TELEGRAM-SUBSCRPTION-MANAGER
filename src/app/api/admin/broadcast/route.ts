@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage, sendMessageWithKeyboard } from '@/lib/telegram'
-import { ADMIN_ID } from '@/lib/config'
+import { getAdminId } from '@/lib/config'
 import { generateMessageHash, hasReceivedMessageRecently, logBroadcastMessage, runBounded } from '@/lib/broadcast'
 
 /**
@@ -9,8 +10,10 @@ import { generateMessageHash, hasReceivedMessageRecently, logBroadcastMessage, r
  * Send a marketing message to all users
  */
 export async function POST(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
-
     // Parse request body
     const body = await request.json()
     const { message, planType, activeOnly, replyMarkup, testMode, testUserId } = body
@@ -21,7 +24,7 @@ export async function POST(request: NextRequest) {
 
     // If test mode, send only to specified user or admin
     if (testMode) {
-      const targetUserId = testUserId || ADMIN_ID
+      const targetUserId = testUserId || getAdminId()
       const sent = replyMarkup
         ? await sendMessageWithKeyboard(targetUserId, message, replyMarkup)
         : await sendMessage(targetUserId, message)
@@ -156,7 +159,9 @@ export async function POST(request: NextRequest) {
 
 // Allow GET for testing (will show usage info)
 export async function GET(request: NextRequest) {
-
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   // Get subscriber stats
   const totalSubscribers = await prisma.subscription.groupBy({
     by: ['planType'],

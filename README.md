@@ -100,13 +100,16 @@ Edit `.env.local` with your credentials:
 TELEGRAM_BOT_TOKEN=your_bot_token_from_botfather
 TELEGRAM_CHANNEL_ID=your_channel_id
 
+# Admin identity (REQUIRED in production — see "Admin identity" below)
+ADMIN_TELEGRAM_ID=your_telegram_user_id
+
 # Paystack Configuration
 PAYSTACK_SECRET_KEY=sk_live_your_paystack_secret_key
 
 # Database Configuration
 DATABASE_URL=mongodb+srv://username:password@cluster.mongodb.net/database
 
-# Cron Security
+# Cron & Admin Route Security (required — routes fail closed with 401 without it)
 CRON_SECRET=generate_a_random_secret_string_here
 
 # Application Configuration
@@ -202,19 +205,60 @@ https://api.telegram.org/botYOUR_BOT_TOKEN/setWebhook?url=https://your-domain.co
 - **URL:** `/api/telegram/webhook`
 - **Method:** `POST`
 - **Description:** Receives all Telegram bot updates
+- **Auth:** Telegram's secret token. The endpoint compares the
+  `X-Telegram-Bot-Api-Secret-Token` header against `TELEGRAM_WEBHOOK_SECRET`
+  (constant-time, fail-closed: **401** when the env var is unset or the
+  header is missing/mismatched). Requests without a valid token are rejected
+  before the update body is read.
+
+**One-time setup after deploy** — register the webhook with the same secret:
+
+```bash
+curl -X POST "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook" \
+  -H "Content-Type: application/json" \
+  -d '{"url": "<WORKER_URL>/api/telegram/webhook", "secret_token": "<TELEGRAM_WEBHOOK_SECRET>", "allowed_updates": ["message","callback_query"]}'
+```
+
+Set the secret on the app worker as well: `wrangler secret put TELEGRAM_WEBHOOK_SECRET`.
 
 ### Paystack Webhook (Optional)
 - **URL:** `/api/paystack/webhook`
 - **Method:** `POST`
 - **Description:** Receives Paystack payment events (backup flow)
 
-### Cron Job
-- **URL:** `/api/cron/remove-expired`
-- **Method:** `GET`
-- **Schedule:** Every hour (`0 * * * *`)
-- **Auth:** Bearer token (`CRON_SECRET`)
+### Cron Job / Admin Endpoints
+- **URLs:** `/api/cron/remove-expired`, `/api/cron/send-broadcast`, `/api/cron/send-reminders`, `/api/cron/send-referral-stats`, `/api/admin/broadcast`, `/api/daily-stats`
+- **Method:** `GET` (cron) / `POST` (broadcast, daily-stats)
+- **Schedule:** driven by the `cron-worker` Worker (see `cron-worker/`)
+- **Auth:** `Authorization: Bearer <CRON_SECRET>` — enforced on every route above.
+  Requests without the header, with a wrong token, or when `CRON_SECRET` is not
+  configured are rejected with **401** (fail-closed).
+
+Set the secret for BOTH workers (the app checks it on every privileged route;
+the cron worker sends it on every scheduled call):
+
+```bash
+wrangler secret put CRON_SECRET          # app worker (this repo's wrangler.jsonc)
+cd cron-worker && wrangler secret put CRON_SECRET
+```
+
+The `vipbot-cron` worker (`cron-worker/src/index.js`) authenticates all calls
+to the app with the same `CRON_SECRET` from its own environment.
 
 ## Configuration
+
+### Admin identity
+
+All privileged bot commands (`/broadcast`, promo-code creation, `/checkuser`,
+`/remove_copier`) authorize on the Telegram user ID resolved by
+`getAdminId()` (`src/lib/config.ts`):
+
+- Production: the numeric `ADMIN_TELEGRAM_ID` env var is **required**. If it is
+  unset, resolving the admin identity throws (fail-closed) instead of trusting
+  the old value that used to be hardcoded in this public repository. Set it
+  with `wrangler secret put ADMIN_TELEGRAM_ID`.
+- Local development only: without the env var, `DEV_FALLBACK_ADMIN_TELEGRAM_ID`
+  in `src/lib/config.ts` is used so `npm run dev` works out of the box.
 
 ### Changing Plan Details
 
@@ -319,5 +363,6 @@ MIT
 ## Support
 
 For issues or questions, please open an issue on GitHub.
-#   T E L E G R A M - S U B S C R P T I O N - M A N A G E R  
+#   T E L E G R A M - S U B S C R P T I O N - M A N A G E R 
+ 
  

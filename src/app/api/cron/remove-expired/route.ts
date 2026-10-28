@@ -1,16 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { banChatMember, sendMessage, sendMessageWithKeyboard, getChatMember } from '@/lib/telegram'
 import { removeUserMt5Account } from '@/lib/metacopier'
-import { ADMIN_ID, PLANS } from '@/lib/config'
+import { PLANS, getAdminId } from '@/lib/config'
 
 const CHANNEL_ID = process.env.TELEGRAM_CHANNEL_ID!
 
 /**
  * GET handler for cron job to remove expired users
- * Open endpoint - no authentication required
+ * Auth: Bearer token (CRON_SECRET) — fail-closed (401 when unset or mismatched)
  */
 export async function GET(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
     console.log(`[Remove Expired Cron] Starting at ${new Date().toISOString()}`)
 
@@ -63,7 +67,7 @@ export async function GET(request: NextRequest) {
             if (result.success) {
               console.log(`Successfully removed MetaCopier account for user ${subscription.telegramUserId}`)
               // Notify admin of successful removal
-              await sendMessage(ADMIN_ID, `✅ <b>MetaCopier Account Removed</b>
+              await sendMessage(getAdminId(), `✅ <b>MetaCopier Account Removed</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -77,7 +81,7 @@ User has been removed from channel and MetaCopier.`)
             } else {
               console.error(`Failed to remove MetaCopier account for user ${subscription.telegramUserId}: ${result.error}`)
               // Notify admin to manually remove
-              await sendMessage(ADMIN_ID, `⚠️ <b>MetaCopier Removal Failed - Manual Action Needed!</b>
+              await sendMessage(getAdminId(), `⚠️ <b>MetaCopier Removal Failed - Manual Action Needed!</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -100,7 +104,7 @@ User has been removed from channel and MetaCopier.`)
           } catch (mcError) {
             console.error(`Failed to delete MetaCopier account for user ${subscription.telegramUserId}:`, mcError)
             // Notify admin of error
-            await sendMessage(ADMIN_ID, `⚠️ <b>MetaCopier Removal Error - Manual Action Needed!</b>
+            await sendMessage(getAdminId(), `⚠️ <b>MetaCopier Removal Error - Manual Action Needed!</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -149,7 +153,7 @@ User has been removed from channel and MetaCopier.`)
         }
 
         // Safety: Never ban admins
-        if (subscription.telegramUserId === ADMIN_ID.toString()) {
+        if (subscription.telegramUserId === getAdminId().toString()) {
           console.log(`Skipping ban for admin user ${subscription.telegramUserId}`)
           await prisma.subscription.update({
             where: { id: subscription.id },

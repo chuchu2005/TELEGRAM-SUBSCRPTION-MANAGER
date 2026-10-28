@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { isAuthorizedCronRequest } from '@/lib/api-auth'
 import { prisma } from '@/lib/prisma'
 import { sendMessage } from '@/lib/telegram'
-import { ADMIN_ID, TRADE_STATS_CONFIG } from '@/lib/config'
+import { TRADE_STATS_CONFIG, getAdminId } from '@/lib/config'
 import { generateTradeStatistics, formatStatsMessage } from '@/lib/trade-stats'
 
 /**
@@ -10,6 +11,9 @@ import { generateTradeStatistics, formatStatsMessage } from '@/lib/trade-stats'
  * Designed to be triggered by any cron service (cron-job.org, Vercel, etc.)
  */
 export async function POST(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   try {
 
     // Collect daily statistics
@@ -173,9 +177,9 @@ ${statsSection}${subsList}
 <i>Generated automatically via daily stats cron</i>`
 
     // Send to admin
-    await sendMessage(ADMIN_ID, message)
+    await sendMessage(getAdminId(), message)
 
-    console.log(`[Daily Stats] Sent daily report to admin ${ADMIN_ID}`)
+    console.log(`[Daily Stats] Sent daily report to admin ${getAdminId()}`)
 
     return NextResponse.json({
       success: true,
@@ -197,7 +201,7 @@ ${statsSection}${subsList}
     console.error('[Daily Stats] Error:', error)
 
     // Send error notification to admin
-    await sendMessage(ADMIN_ID, `❌ <b>Daily Stats Failed!</b>
+    await sendMessage(getAdminId(), `❌ <b>Daily Stats Failed!</b>
 
 ━━━━━━━━━━━━━━━━━━━
 
@@ -222,6 +226,9 @@ Error generating daily statistics report.
  * GET handler - for testing
  */
 export async function GET(request: NextRequest) {
+  if (!isAuthorizedCronRequest(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
   return NextResponse.json({
     status: 'Daily stats endpoint is running',
     usage: 'Send POST request to trigger daily stats'
